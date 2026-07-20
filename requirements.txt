@@ -12,6 +12,7 @@ anthropic==0.34.2
 sqlalchemy==2.0.35
 asyncpg==0.29.0
 alembic==1.13.2
+greenlet==3.1.1
 
 # Market data
 yfinance==0.2.43
