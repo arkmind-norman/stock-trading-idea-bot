@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum as PyEnum
+from typing import List, Optional
 
 from sqlalchemy import Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -30,12 +33,12 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     telegram_user_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    username: Mapped[str | None] = mapped_column(String(128))
+    username: Mapped[Optional[str]] = mapped_column(String(128))
     display_name: Mapped[str] = mapped_column(String(256), nullable=False)
-    first_idea_at: Mapped[datetime | None] = mapped_column(DateTime)
+    first_idea_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
-    ideas: Mapped[list["Idea"]] = relationship(back_populates="user")
-    equity_history: Mapped[list["DailyEquity"]] = relationship(back_populates="user")
+    ideas: Mapped[List[Idea]] = relationship(back_populates="user")
+    equity_history: Mapped[List[DailyEquity]] = relationship(back_populates="user")
 
 
 class Idea(Base):
@@ -44,15 +47,15 @@ class Idea(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
-    ticker: Mapped[str | None] = mapped_column(String(16))
-    direction: Mapped[Direction | None] = mapped_column(Enum(Direction))
-    target_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
-    stop_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
+    ticker: Mapped[Optional[str]] = mapped_column(String(16))
+    direction: Mapped[Optional[Direction]] = mapped_column(Enum(Direction))
+    target_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4))
+    stop_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4))
     submitted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     status: Mapped[IdeaStatus] = mapped_column(Enum(IdeaStatus), default=IdeaStatus.pending)
 
     user: Mapped[User] = relationship(back_populates="ideas")
-    position: Mapped["Position | None"] = relationship(back_populates="idea", uselist=False)
+    position: Mapped[Optional[Position]] = relationship(back_populates="idea", uselist=False)
 
 
 class Position(Base):
@@ -62,11 +65,11 @@ class Position(Base):
     idea_id: Mapped[int] = mapped_column(ForeignKey("ideas.id"), unique=True, nullable=False)
     entry_price: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
     entry_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    exit_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
-    exit_time: Mapped[datetime | None] = mapped_column(DateTime)
+    exit_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4))
+    exit_time: Mapped[Optional[datetime]] = mapped_column(DateTime)
     notional: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
     status: Mapped[PositionStatus] = mapped_column(Enum(PositionStatus), default=PositionStatus.open)
-    pnl: Mapped[Decimal | None] = mapped_column(Numeric(12, 4))
+    pnl: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4))
 
     idea: Mapped[Idea] = relationship(back_populates="position")
 
