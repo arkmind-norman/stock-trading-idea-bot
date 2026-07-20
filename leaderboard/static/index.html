@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Trading Idea Leaderboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
+    th { background: #f8fafc; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    tr:hover { background: #f1f5f9; cursor: pointer; }
+    .positive { color: #16a34a; }
+    .negative { color: #dc2626; }
+    #chart-section { margin-top: 2rem; display: none; }
+    canvas { max-height: 300px; }
+  </style>
+</head>
+<body>
+  <h1>Leaderboard</h1>
+  <p id="status">Loading…</p>
+  <table id="leaderboard-table" style="display:none">
+    <thead>
+      <tr>
+        <th>#</th><th>Name</th><th>P&amp;L</th><th>Win Rate</th><th>Ideas</th>
+      </tr>
+    </thead>
+    <tbody id="leaderboard-body"></tbody>
+  </table>
+
+  <div id="chart-section">
+    <h2 id="chart-title"></h2>
+    <canvas id="equity-chart"></canvas>
+  </div>
+
+  <script>
+    // TODO: replace with real API calls once backend endpoints are implemented
+    async function loadLeaderboard() {
+      const res = await fetch('/leaderboard/data/leaderboard');
+      const rows = await res.json();
+      const tbody = document.getElementById('leaderboard-body');
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        const pnlClass = r.pnl >= 0 ? 'positive' : 'negative';
+        tr.innerHTML = `
+          <td>${r.rank}</td>
+          <td>${r.username}</td>
+          <td class="${pnlClass}">$${r.pnl.toFixed(2)}</td>
+          <td>${(r.win_rate * 100).toFixed(0)}%</td>
+          <td>${r.idea_count}</td>`;
+        tr.addEventListener('click', () => loadUserChart(r.telegram_user_id, r.username));
+        tbody.appendChild(tr);
+      });
+      document.getElementById('status').style.display = 'none';
+      document.getElementById('leaderboard-table').style.display = '';
+    }
+
+    let chart = null;
+    async function loadUserChart(userId, username) {
+      const res = await fetch(`/leaderboard/data/user/${userId}`);
+      const data = await res.json();
+      document.getElementById('chart-title').textContent = `${username} — equity curve`;
+      document.getElementById('chart-section').style.display = '';
+      if (chart) chart.destroy();
+      chart = new Chart(document.getElementById('equity-chart'), {
+        type: 'line',
+        data: {
+          labels: data.equity_curve.map(p => p.date),
+          datasets: [{ label: 'Equity ($)', data: data.equity_curve.map(p => p.equity),
+                       borderColor: '#2563eb', tension: 0.3, pointRadius: 2 }],
+        },
+        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false } } },
+      });
+    }
+
+    loadLeaderboard().catch(e => {
+      document.getElementById('status').textContent = 'Failed to load data.';
+      console.error(e);
+    });
+  </script>
+</body>
+</html>
