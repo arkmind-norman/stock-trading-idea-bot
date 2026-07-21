@@ -6,7 +6,8 @@ from sqlalchemy.orm import DeclarativeBase
 
 from db.config import settings
 
-_local = any(h in settings.DATABASE_URL for h in ["localhost", "127.0.0.1"])
+# No SSL for local or Railway private-network URLs (.railway.internal).
+_local = any(h in settings.DATABASE_URL for h in ["localhost", "127.0.0.1", ".railway.internal"])
 _connect_args = {} if _local else {"ssl": ssl.create_default_context()}
 
 engine = create_async_engine(settings.DATABASE_URL, connect_args=_connect_args, echo=False)
