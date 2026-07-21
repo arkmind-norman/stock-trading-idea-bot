@@ -19,7 +19,8 @@
   --sans: 'Sora', sans-serif;
   --shadow: 0 1px 2px rgba(24,10,45,.05), 0 6px 20px rgba(24,10,45,.04);
 }
-body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+html, body, #root { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); display: flex; flex-direction: column; overflow: hidden; }
 ::selection { background: #7c3aed33; }
 @keyframes pulseDot { 0%,100%{opacity:1} 50%{opacity:.35} }
 button { font-family: var(--sans); }
@@ -27,9 +28,9 @@ a { color: var(--purple); }
 
 /* ── Header bar ───────────────────────────────────────────────────────── */
 .topbar {
+  flex-shrink: 0;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 32px; background: var(--panel); border-bottom: 1px solid var(--border);
-  position: sticky; top: 0; z-index: 30;
+  padding: 12px 28px; background: var(--panel); border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand-mark {
@@ -46,54 +47,69 @@ a { color: var(--purple); }
 .live-pill span:last-child { font-size: 12.5px; font-weight: 700; color: var(--purple-dark); letter-spacing: .03em; text-transform: uppercase; }
 
 /* ── Shell ────────────────────────────────────────────────────────────── */
-#app { max-width: 1440px; margin: 0 auto; padding: 24px 32px 56px; }
+/* Fills the rest of the viewport below the topbar; nothing here scrolls the
+   whole page — only individual panels scroll internally if they overflow. */
+#app {
+  flex: 1;
+  min-height: 0;
+  max-width: 1680px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 16px 24px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+}
 
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); }
 
-/* ── Top grid ─────────────────────────────────────────────────────────── */
-.top-grid {
-  display: grid;
-  grid-template-columns: 1.25fr 1.25fr 1fr 1fr;
-  grid-template-rows: auto 1fr;
-  gap: 18px;
-  align-items: start;
-  margin-bottom: 18px;
-}
+.main-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
 
-/* ── Info panel ───────────────────────────────────────────────────────── */
-.info-panel { grid-column: 1; grid-row: 1; padding: 20px; }
-.info-panel h1 { font-size: 19px; font-weight: 800; letter-spacing: -.01em; margin-bottom: 4px; }
-.info-panel .sub { font-size: 12.5px; color: var(--dim); line-height: 1.5; margin-bottom: 16px; }
-.meta-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
-.meta-row:last-child { border-bottom: none; padding-bottom: 0; }
+/* ── Info panel — compact horizontal strip ───────────────────────────── */
+.info-panel {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; flex-wrap: wrap;
+  padding: 12px 22px;
+}
+.info-title h1 { font-size: 16px; font-weight: 800; letter-spacing: -.01em; }
+.info-title .sub { font-size: 11.5px; color: var(--dim); margin-top: 1px; }
+.info-meta { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.meta-item { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 .meta-icon {
-  width: 26px; height: 26px; border-radius: 8px; background: var(--purple-softer);
-  display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0;
+  width: 22px; height: 22px; border-radius: 7px; background: var(--purple-softer);
+  display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;
 }
-.meta-label { font-weight: 700; color: var(--text); flex-shrink: 0; }
-.meta-val { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta-val { font-size: 12px; color: var(--dim); font-weight: 600; }
 
-/* ── Ranked panel ─────────────────────────────────────────────────────── */
-.ranked-panel { grid-column: 2; grid-row: 1; padding: 8px; max-height: 300px; overflow-y: auto; }
-.panel-hdr { padding: 12px 12px 8px; }
-.panel-hdr h2 { font-size: 14.5px; font-weight: 700; }
+/* ── Ranked panel — full-height right sidebar ────────────────────────── */
+.ranked-panel {
+  grid-column: 2; grid-row: 1 / 3;
+  padding: 6px;
+  display: flex; flex-direction: column;
+  min-height: 0;
+}
+.panel-hdr { flex-shrink: 0; padding: 14px 14px 10px; }
+.panel-hdr h2 { font-size: 15px; font-weight: 700; }
 .panel-hdr p { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+.rk-list { flex: 1; min-height: 0; overflow-y: auto; }
 .rk-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 12px; margin: 2px 4px; border-radius: 12px; cursor: pointer;
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; margin: 2px 6px; border-radius: 12px; cursor: pointer;
   border: 1px solid transparent; transition: all .12s;
 }
 .rk-row:hover { background: var(--panel-soft); }
 .rk-row.active { background: var(--purple-softer); border-color: #e3d9fb; }
-.rk-rank { width: 16px; font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; flex-shrink: 0; }
+.rk-rank { width: 18px; font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--muted); text-align: center; flex-shrink: 0; }
 .avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
-.rk-avatar { width: 32px; height: 32px; font-size: 11px; }
+.rk-avatar { width: 38px; height: 38px; font-size: 13px; }
 .rk-info { flex: 1; min-width: 0; }
-.rk-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rk-sub { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+.rk-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
 .pnl-pill {
-  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
-  padding: 4px 9px; border-radius: 20px; white-space: nowrap;
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  padding: 5px 10px; border-radius: 20px; white-space: nowrap;
 }
 .view-btn {
   border: none; background: var(--purple); color: #fff;
@@ -102,9 +118,13 @@ a { color: var(--purple); }
 }
 .view-btn:hover { background: var(--purple-dark); }
 
-/* ── Chart panel (spans info + ranked columns) ───────────────────────── */
-.chart-panel { grid-column: 1 / 3; grid-row: 2; padding: 22px 22px 18px; }
-.chart-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+/* ── Chart panel — prioritized, fills remaining main-column height ──── */
+.chart-panel {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  padding: 20px 22px 16px;
+}
+.chart-top { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
 .chart-top-left { display: flex; align-items: center; gap: 12px; }
 .chart-title { display: flex; align-items: center; gap: 8px; }
 .chart-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--purple); }
@@ -114,18 +134,21 @@ a { color: var(--purple); }
 .toggle-group { display: flex; gap: 4px; background: var(--panel-soft); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
 .toggle-btn { border: none; background: transparent; color: var(--muted); font-family: var(--mono); font-size: 12px; font-weight: 700; padding: 6px 13px; border-radius: 7px; cursor: pointer; transition: all .15s; }
 .toggle-btn.active { background: var(--purple); color: #fff; }
-.legend-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.legend-chips { flex-shrink: 0; display: flex; gap: 8px; flex-wrap: wrap; }
 .chip { display: flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px 4px 6px; cursor: pointer; transition: opacity .15s; }
 .chip.off { opacity: .32; }
 .chip-dot { width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #fff; flex-shrink: 0; }
 .chip-name { font-size: 11.5px; font-weight: 600; }
-.chart-wrap { position: relative; height: 300px; }
+.chart-wrap { position: relative; flex: 1; min-height: 0; }
 .chart-wrap canvas { display: block; }
 
+/* ── Bottom row: idea feed + portfolio, side by side ─────────────────── */
+.bottom-row { flex-shrink: 0; height: 260px; display: flex; gap: 14px; min-height: 0; }
+
 /* ── Chat / idea feed panel ──────────────────────────────────────────── */
-.chat-panel { grid-column: 3; grid-row: 1 / 3; display: flex; flex-direction: column; max-height: 636px; }
+.chat-panel { flex: 1.3; display: flex; flex-direction: column; min-height: 0; }
 .chat-panel .panel-hdr { border-bottom: 1px solid var(--border); }
-.chat-list { flex: 1; overflow-y: auto; padding: 6px 4px; }
+.chat-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 4px; }
 .chat-item { padding: 12px 14px; margin: 2px 6px; border-radius: 14px; cursor: pointer; border: 1px solid transparent; transition: all .12s; }
 .chat-item:hover { background: var(--panel-soft); border-color: var(--border); }
 .chat-item-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
@@ -137,7 +160,7 @@ a { color: var(--purple); }
 .chat-tag { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
 
 /* ── Portfolio panel ──────────────────────────────────────────────────── */
-.portfolio-panel { grid-column: 4; grid-row: 1 / 3; display: flex; flex-direction: column; max-height: 636px; padding: 8px; }
+.portfolio-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 8px; }
 .pf-hdr { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 12px; border-bottom: 1px solid var(--border); }
 .pf-user { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .pf-avatar { width: 30px; height: 30px; font-size: 11px; }
@@ -167,20 +190,26 @@ a { color: var(--purple); }
 .empty { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.6; }
 
 /* ── Responsive ───────────────────────────────────────────────────────── */
-@media (max-width: 1180px) {
-  .top-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto; }
-  .info-panel { grid-column: 1; grid-row: 1; }
-  .ranked-panel { grid-column: 2; grid-row: 1; }
-  .chart-panel { grid-column: 1 / 3; grid-row: 2; }
-  .chat-panel { grid-column: 1; grid-row: 3; max-height: 420px; }
-  .portfolio-panel { grid-column: 2; grid-row: 3; max-height: 420px; }
+/* Below this width there's no reasonable way to fit the chart + ~8 traders
+   + feed on one screen without everything becoming too cramped to read, so
+   the "no page scroll" layout gives way to a normal scrollable stack. */
+@media (max-width: 1100px) {
+  html, body, #root { height: auto; }
+  body { overflow: auto; }
+  #app { display: block; height: auto; padding: 16px 20px 40px; }
+  .main-col { gap: 14px; }
+  .info-panel { align-items: flex-start; }
+  .chart-panel { flex: none; }
+  .chart-wrap { flex: none; height: 300px; }
+  .bottom-row { height: auto; flex-direction: column; }
+  .chat-panel, .portfolio-panel { flex: none; max-height: 360px; }
+  .ranked-panel { margin-top: 14px; max-height: 420px; }
+  .rk-list { max-height: 360px; }
 }
 @media (max-width: 760px) {
   .topbar { padding: 12px 16px; }
-  #app { padding: 16px 14px 48px; }
-  .top-grid { grid-template-columns: 1fr; grid-template-rows: none; gap: 14px; }
-  .info-panel, .ranked-panel, .chart-panel, .chat-panel, .portfolio-panel { grid-column: 1; grid-row: auto; }
-  .ranked-panel, .chat-panel, .portfolio-panel { max-height: 360px; }
+  #app { padding: 14px 14px 40px; }
+  .info-panel { padding: 14px 16px; }
   .chart-wrap { height: 220px; }
   .chart-top { flex-direction: column; align-items: flex-start; }
 }

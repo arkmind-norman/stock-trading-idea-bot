@@ -57,13 +57,17 @@ export default function App() {
         {error && !data ? (
           <div className="empty">⚠️ Couldn't load data.<br />Is the server running?</div>
         ) : (
-          <div className="top-grid">
-            <InfoPanel traderCount={data?.users.length ?? 0} />
+          <>
+            <div className="main-col">
+              <InfoPanel traderCount={data?.users.length ?? 0} />
+              <ChartPanel users={data?.users ?? []} />
+              <div className="bottom-row">
+                <ChatPanel feed={data?.feed ?? []} onSelect={setSelected} />
+                <PortfolioPanel users={data?.users ?? []} feed={data?.feed ?? []} selected={selected} />
+              </div>
+            </div>
             <RankedPanel users={data?.users ?? []} selected={selected} onSelect={setSelected} />
-            <ChartPanel users={data?.users ?? []} />
-            <ChatPanel feed={data?.feed ?? []} onSelect={setSelected} />
-            <PortfolioPanel users={data?.users ?? []} feed={data?.feed ?? []} selected={selected} />
-          </div>
+          </>
         )}
       </div>
     </>
