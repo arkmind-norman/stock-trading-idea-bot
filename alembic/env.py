@@ -20,9 +20,9 @@ target_metadata = Base.metadata
 _db_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://", 1)
 config.set_main_option("sqlalchemy.url", _db_url)
 
-# Local URLs don't need SSL; all external URLs (Railway, RDS, etc.) do.
-_local = any(h in _db_url for h in ["localhost", "127.0.0.1"])
-_connect_args = {} if _local else {"sslmode": "require"}
+# Let psycopg2 negotiate SSL automatically (sslmode=prefer by default).
+# Forcing sslmode=require breaks Railway's TCP proxy which doesn't do SSL termination.
+_connect_args: dict = {}
 
 
 def run_migrations_offline() -> None:
