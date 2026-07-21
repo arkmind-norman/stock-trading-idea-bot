@@ -153,10 +153,11 @@ a { color: var(--purple); }
 .pf-col-hdr { display: flex; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; padding: 6px 6px; }
 .pf-row { display: flex; align-items: center; gap: 8px; padding: 9px 6px; border-bottom: 1px solid var(--border); font-size: 12px; }
 .pf-row:last-child { border-bottom: none; }
-.pf-sym { font-weight: 700; flex: 1.2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-sym { display: flex; align-items: center; font-weight: 700; flex: 1.2; min-width: 0; }
+.pf-sym-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .pf-mid { flex: 1; color: var(--dim); font-family: var(--mono); font-size: 11px; text-align: right; }
 .pf-pnl { flex: 0.9; text-align: right; font-family: var(--mono); font-weight: 700; }
-.pf-status { font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 8px; margin-left: 4px; }
+.pf-status { font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 8px; margin-left: 4px; flex-shrink: 0; }
 
 /* ── Utility ──────────────────────────────────────────────────────────── */
 .pos { color: var(--green); }

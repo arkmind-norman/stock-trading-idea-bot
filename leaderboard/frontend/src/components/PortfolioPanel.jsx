@@ -79,7 +79,7 @@ export default function PortfolioPanel({ users, feed, selected }) {
             {userIdeas.map((f, i) => (
               <div className="pf-row" key={i}>
                 <span className="pf-sym">
-                  {tEmoji(f.ticker, f.direction)} {f.ticker || '?'}
+                  <span className="pf-sym-label">{tEmoji(f.ticker, f.direction)} {f.ticker || '?'}</span>
                   <span
                     className={`pf-status ${f.status === 'open' ? 'pos-bg' : ''}`}
                     style={f.status === 'open' ? undefined : { background: '#f0eef7', color: '#a39fb0' }}
