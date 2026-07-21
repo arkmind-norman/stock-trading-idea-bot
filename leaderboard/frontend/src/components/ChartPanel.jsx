@@ -49,11 +49,24 @@ export default function ChartPanel({ users }) {
   const [tf, setTf] = useState('ALL');
   const [hidden, setHidden] = useState(() => new Set());
   const [status, setStatus] = useState(marketStatus());
+  const [avatarImages, setAvatarImages] = useState({});
 
   useEffect(() => {
     const id = setInterval(() => setStatus(marketStatus()), 60000);
     return () => clearInterval(id);
   }, []);
+
+  // Preload each trader's Telegram photo once for the chart's end-label
+  // avatars (canvas needs an already-loaded <img>, not a URL).
+  useEffect(() => {
+    users.forEach((u) => {
+      if (!u.photo_url || avatarImages[u.telegram_user_id]) return;
+      const img = new Image();
+      img.onload = () => setAvatarImages((prev) => ({ ...prev, [u.telegram_user_id]: img }));
+      img.src = u.photo_url;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users]);
 
   function toggleUser(uid) {
     setHidden((prev) => {
@@ -71,7 +84,7 @@ export default function ChartPanel({ users }) {
     maintainAspectRatio: false,
     animation: { duration: 350 },
     interaction: { mode: 'index', intersect: false },
-    layout: { padding: { right: isMobile ? 8 : 120, left: 2, top: 10, bottom: 4 } },
+    layout: { padding: { right: isMobile ? 8 : 160, left: 2, top: 10, bottom: 4 } },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -122,7 +135,10 @@ export default function ChartPanel({ users }) {
     },
   }), [mode, isMobile]);
 
-  const plugins = useMemo(() => [zeroLinePlugin, makeEndLabelPlugin(users, mode)], [users, mode]);
+  const plugins = useMemo(
+    () => [zeroLinePlugin, makeEndLabelPlugin(users, mode, avatarImages)],
+    [users, mode, avatarImages]
+  );
 
   return (
     <div className="panel chart-panel">
