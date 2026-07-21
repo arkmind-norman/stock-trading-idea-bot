@@ -49,6 +49,11 @@ a { color: var(--purple); }
 /* ── Shell ────────────────────────────────────────────────────────────── */
 /* Fills the rest of the viewport below the topbar; nothing here scrolls the
    whole page — only individual panels scroll internally if they overflow. */
+/* Flex row, not grid — a grid's `fr` row track needs #app's own height to
+   already be resolved, which fights with #app's own flex:1 grow inside
+   body once its content has real intrinsic height (chart-panel/bottom-row
+   min-heights), so #app stalled at content size instead of filling the
+   viewport. Flexbox's grow algorithm doesn't have that circularity. */
 #app {
   flex: 1;
   min-height: 0;
@@ -57,9 +62,7 @@ a { color: var(--purple); }
   margin: 0 auto;
   padding: 16px 24px;
   box-sizing: border-box;
-  display: grid;
-  grid-template-columns: 1fr 380px;
-  grid-template-rows: minmax(0, 1fr);
+  display: flex;
   gap: 16px;
 }
 
@@ -70,7 +73,7 @@ a { color: var(--purple); }
    column scrolls internally rather than the chart canvas visually breaking
    (Chart.js doesn't reliably shrink a canvas whose flex container gets
    squeezed toward 0). Doesn't trigger at normal window heights. */
-.main-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
+.main-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
 
 /* ── Info panel — compact horizontal strip ───────────────────────────── */
 .info-panel {
@@ -91,7 +94,7 @@ a { color: var(--purple); }
 
 /* ── Ranked panel — full-height right sidebar ────────────────────────── */
 .ranked-panel {
-  grid-column: 2; grid-row: 1 / 3;
+  flex: 0 0 380px;
   padding: 6px;
   display: flex; flex-direction: column;
   min-height: 0;
