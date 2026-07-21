@@ -98,19 +98,21 @@ export function makeEndLabelPlugin(liveRef) {
 
         ctx.font = 'bold 13px IBM Plex Mono, monospace';
         const textWidth = ctx.measureText(label).width;
+        const textGap = 6;
         const pillLeft = cx - AVATAR_R;
-        const pillWidth = AVATAR_R + PILL_PAD + textWidth + PILL_PAD;
+        const pillWidth = AVATAR_R * 2 + textGap + textWidth + PILL_PAD;
 
         // Pill
         ctx.fillStyle = color;
         roundRectPath(ctx, pillLeft, y - PILL_H / 2, pillWidth, PILL_H, PILL_H / 2);
         ctx.fill();
 
-        // Value text
+        // Value text — starts past the avatar's right edge so the avatar
+        // (drawn after, on top) doesn't cover the start of the text.
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText(label, cx + AVATAR_R * 0.6, y);
+        ctx.fillText(label, cx + AVATAR_R + textGap, y);
 
         // Avatar circle, overlapping the pill's rounded left end
         const img = avatarImages && avatarImages[user.telegram_user_id];
