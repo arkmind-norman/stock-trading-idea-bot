@@ -1,27 +1,29 @@
-from telegram.ext import Application, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
-from bot.handlers import log_group_message
+from bot.handlers import handle_leaderboard, handle_myideas, log_group_message
 from db.config import settings
 
 
 def build_application() -> Application:
     app = Application.builder().token(settings.TELEGRAM_BOT_TOKEN).build()
 
-    # Catch all plain-text messages in groups and supergroups.
-    # Requires Group Privacy to be DISABLED in @BotFather so the bot
-    # receives messages that aren't directed at it with a / command.
+    # Receive all plain-text messages in groups so we can detect trade ideas.
+    # Requires Group Privacy to be DISABLED in @BotFather.
     app.add_handler(
         MessageHandler(
-            filters.TEXT & filters.ChatType.GROUPS,
+            filters.TEXT & filters.ChatType.GROUPS & ~filters.COMMAND,
             log_group_message,
         )
     )
 
+    # /leaderboard — ranked P&L table for all participants
+    app.add_handler(CommandHandler("leaderboard", handle_leaderboard))
+
+    # /myideas — the caller's open and recently-closed positions
+    app.add_handler(CommandHandler("myideas", handle_myideas))
+
     return app
 
 
-# Module-level singleton.
-# Application.builder().build() is cheap — no network call yet.
-# The actual connection to Telegram happens in application.initialize()
-# which is called from the FastAPI lifespan on startup.
+# Module-level singleton — no network call until application.initialize().
 application = build_application()
