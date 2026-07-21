@@ -1,11 +1,13 @@
 """
-Intraday equity snapshot job — runs every ~45s while the US market is open.
+Intraday equity (P&L) snapshot job — runs every 1 minute while the US market
+is open.
 
 Pulls a fresh price for every ticker with an open position and writes one
-EquitySnapshot row per user, so the leaderboard chart can show live intraday
-movement instead of just one point per day. The daily close-of-market job
-(simulator.daily_job) remains the source of truth for each day's final point
-and prunes these intraday rows once superseded.
+EquitySnapshot row per user (cumulative P&L at that minute), so the
+leaderboard chart can show live intraday movement instead of just one point
+per day. The daily close-of-market job (simulator.daily_job) remains the
+source of truth for each day's final point and prunes these intraday rows
+once superseded.
 """
 from __future__ import annotations
 

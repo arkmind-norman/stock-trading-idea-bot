@@ -247,7 +247,7 @@
         <div class="chart-top-left">
           <div class="chart-title">
             <span class="chart-dot"></span>
-            <h2>Total Account Value</h2>
+            <h2>Total P&amp;L</h2>
           </div>
           <div class="toggle-group">
             <button class="toggle-btn active" data-mode="$" onclick="setMode('$')">$</button>
@@ -685,9 +685,9 @@ function renderPortfolio() {
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
 // Data refetches every 5s from our own API (cheap — just a DB read); the
-// backend independently pulls fresh prices from yfinance every ~45s during
-// market hours and persists them, so refreshes in between simply repeat the
-// latest known values until the next backend tick lands.
+// backend independently pulls fresh prices from yfinance every 1 minute
+// during market hours and persists them, so refreshes in between simply
+// repeat the latest known values until the next backend tick lands.
 function withScrollPreserved(ids, fn) {
   const positions = ids.map(id => document.getElementById(id)?.scrollTop ?? 0);
   fn();

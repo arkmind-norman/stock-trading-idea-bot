@@ -42,10 +42,10 @@ async def lifespan(app: FastAPI):
         misfire_grace_time=3600,  # run even if the process was down at trigger time
     )
     # ── Intraday equity snapshots ────────────────────────────────────────────────
-    # Every 45s while the US market is open; no-op outside market hours.
+    # Every 1 minute while the US market is open; no-op outside market hours.
     _scheduler.add_job(
         run_intraday_job,
-        IntervalTrigger(seconds=45),
+        IntervalTrigger(minutes=1),
         id="intraday_equity_snapshot",
         replace_existing=True,
         misfire_grace_time=30,
@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
     _scheduler.start()
     logger.info(
         "Scheduler started — daily job fires at 16:30 America/New_York Mon–Fri, "
-        "intraday snapshots every 45s during market hours"
+        "intraday P&L snapshots every 1 minute during market hours"
     )
 
     # ── Telegram bot ───────────────────────────────────────────────────────────
