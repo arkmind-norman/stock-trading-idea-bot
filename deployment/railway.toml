@@ -1,14 +1,3 @@
-[build]
-builder = "dockerfile"
-dockerfilePath = "deployment/Dockerfile"
-
-[deploy]
-startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
-healthcheckPath = "/health"
-healthcheckTimeout = 30
-
-[[services]]
-name = "daily-job"
-# Run daily after US market close — 21:00 UTC (5 PM ET)
-cronSchedule = "0 21 * * 1-5"
-startCommand = "python simulator/daily_job.py"
+# This file is superseded by railway.json at the project root.
+# Railway reads railway.json (or railway.toml) from the root of the repo.
+# The Dockerfile referenced here was never created; nixpacks is used instead.

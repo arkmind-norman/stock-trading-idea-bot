@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -12,9 +13,9 @@ class Base(DeclarativeBase):
 
 
 async def init_db() -> None:
-    # TODO: replace with Alembic migrations before production
+    """Verify DB connectivity on startup. Schema is managed by Alembic migrations."""
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text("SELECT 1"))
 
 
 async def get_session() -> AsyncSession:

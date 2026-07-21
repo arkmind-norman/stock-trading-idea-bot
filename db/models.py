@@ -36,6 +36,7 @@ class User(Base):
     username: Mapped[Optional[str]] = mapped_column(String(128))
     display_name: Mapped[str] = mapped_column(String(256), nullable=False)
     first_idea_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    photo_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
 
     ideas: Mapped[List[Idea]] = relationship(back_populates="user")
     equity_history: Mapped[List[DailyEquity]] = relationship(back_populates="user")
@@ -48,6 +49,7 @@ class Idea(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
     ticker: Mapped[Optional[str]] = mapped_column(String(16))
+    company_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     direction: Mapped[Optional[Direction]] = mapped_column(Enum(Direction))
     target_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4))
     stop_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 4))
