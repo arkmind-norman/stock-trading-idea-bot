@@ -1,418 +1,320 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alpha Chat 📈 — Leaderboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg:      #0a0c10;
-      --panel:   #12151b;
-      --panel2:  #171b22;
-      --border:  #1f242c;
-      --text:    #e8eaed;
-      --dim:     #8b93a1;
-      --muted:   #5b6472;
-      --green:   #34d399;
-      --red:     #f87171;
-      --mono:    'IBM Plex Mono', monospace;
-      --sans:    'Sora', sans-serif;
-    }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-      min-height: 100vh;
-    }
-    ::selection { background: #34d39944; }
-    @keyframes pulseDot { 0%,100%{opacity:1} 50%{opacity:.3} }
-    button { font-family: var(--sans); }
-    a { color: var(--green); }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Alpha Chat 📈 — Leaderboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:          #f6f5fb;
+    --panel:       #ffffff;
+    --panel-soft:  #faf9fd;
+    --border:      #eae7f3;
+    --text:        #181521;
+    --dim:         #6b6478;
+    --muted:       #a39fb0;
+    --purple:      #7c3aed;
+    --purple-dark: #6d28d9;
+    --purple-soft: #efe9fe;
+    --purple-softer: #f6f3fe;
+    --green:       #16a34a;
+    --green-soft:  #e8f8ef;
+    --red:         #e11d48;
+    --red-soft:    #fdeaef;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Sora', sans-serif;
+    --shadow: 0 1px 2px rgba(24,10,45,.05), 0 6px 20px rgba(24,10,45,.04);
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+  ::selection { background: #7c3aed33; }
+  @keyframes pulseDot { 0%,100%{opacity:1} 50%{opacity:.35} }
+  button { font-family: var(--sans); }
+  a { color: var(--purple); }
 
-    /* ── App shell ────────────────────────────────────────────────────────── */
-    #app { padding: 32px 40px 56px; max-width: 1320px; margin: 0 auto; }
+  /* ── Header bar ───────────────────────────────────────────────────────── */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px; background: var(--panel); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 30;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--purple), var(--purple-dark));
+    display: flex; align-items: center; justify-content: center; font-size: 17px;
+  }
+  .brand-name { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+  .live-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--purple-soft); border-radius: 20px; padding: 6px 14px;
+  }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--purple); animation: pulseDot 1.8s ease-in-out infinite; }
+  .live-pill span:last-child { font-size: 12.5px; font-weight: 700; color: var(--purple-dark); letter-spacing: .03em; text-transform: uppercase; }
 
-    /* ── Header ───────────────────────────────────────────────────────────── */
-    .header {
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 24px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
-    .live-badge { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-    .live-dot {
-      width: 9px; height: 9px; border-radius: 50%;
-      background: var(--green);
-      animation: pulseDot 1.8s ease-in-out infinite;
-    }
-    .live-text {
-      font-size: 13px; color: var(--dim);
-      letter-spacing: .08em; text-transform: uppercase; font-weight: 600;
-    }
-    h1 { font-size: 32px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 4px; }
-    .subtitle { color: var(--dim); font-size: 14.5px; }
+  /* ── Shell ────────────────────────────────────────────────────────────── */
+  #app { max-width: 1440px; margin: 0 auto; padding: 24px 32px 56px; }
 
-    .time-filters {
-      display: flex; gap: 6px;
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: 12px; padding: 4px;
-    }
-    .tf-btn {
-      border: none; background: transparent; color: var(--muted);
-      font-family: var(--mono); font-size: 13px; font-weight: 600;
-      padding: 8px 16px; border-radius: 8px; cursor: pointer;
-      transition: all .15s;
-    }
-    .tf-btn.active   { background: #262c36; color: var(--text); }
-    .tf-btn:hover:not(.active) { color: var(--dim); background: #1a1f2744; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); }
 
-    /* ── Grid ─────────────────────────────────────────────────────────────── */
-    .main-grid {
-      display: grid;
-      grid-template-columns: 1fr 340px;
-      gap: 20px;
-      align-items: start;
-    }
+  /* ── Top grid ─────────────────────────────────────────────────────────── */
+  .top-grid {
+    display: grid;
+    grid-template-columns: 1.25fr 1.25fr 1fr 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 18px;
+    align-items: start;
+    margin-bottom: 18px;
+  }
 
-    /* ── Generic panel ────────────────────────────────────────────────────── */
-    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; }
+  /* ── Info panel ───────────────────────────────────────────────────────── */
+  .info-panel { grid-column: 1; grid-row: 1; padding: 20px; }
+  .info-panel h1 { font-size: 19px; font-weight: 800; letter-spacing: -.01em; margin-bottom: 4px; }
+  .info-panel .sub { font-size: 12.5px; color: var(--dim); line-height: 1.5; margin-bottom: 16px; }
+  .meta-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+  .meta-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .meta-icon {
+    width: 26px; height: 26px; border-radius: 8px; background: var(--purple-softer);
+    display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0;
+  }
+  .meta-label { font-weight: 700; color: var(--text); flex-shrink: 0; }
+  .meta-val { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    /* ── Chart panel ──────────────────────────────────────────────────────── */
-    .chart-panel { padding: 24px 24px 20px; margin-bottom: 20px; }
-    .chart-top {
-      display: flex; align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap; gap: 14px; margin-bottom: 14px;
-    }
-    .chart-top-left { display: flex; align-items: center; gap: 12px; }
-    .chart-top h2 { font-size: 16px; font-weight: 700; }
-    .mode-toggle {
-      display: flex; gap: 4px;
-      background: #0d1015; border: 1px solid var(--border);
-      border-radius: 8px; padding: 3px;
-    }
-    .mode-btn {
-      border: none; background: transparent; color: var(--muted);
-      font-family: var(--mono); font-size: 12px; font-weight: 700;
-      padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: all .15s;
-    }
-    .mode-btn.active { background: #262c36; color: var(--text); }
-    .legend-chips { display: flex; gap: 8px; flex-wrap: wrap; }
-    .chip {
-      display: flex; align-items: center; gap: 6px;
-      background: transparent; border: 1px solid var(--border);
-      border-radius: 20px; padding: 4px 10px 4px 6px;
-      cursor: pointer; transition: opacity .15s;
-    }
-    .chip.off { opacity: .3; }
-    .chip-dot {
-      width: 16px; height: 16px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 8.5px; font-weight: 800; color: #0a0c10; flex-shrink: 0;
-    }
-    .chip-name { font-size: 12px; font-weight: 600; color: var(--text); }
-    .chart-wrap { position: relative; height: 300px; }
-    #chart { display: block; }
+  /* ── Ranked panel ─────────────────────────────────────────────────────── */
+  .ranked-panel { grid-column: 2; grid-row: 1; padding: 8px; max-height: 300px; overflow-y: auto; }
+  .panel-hdr { padding: 12px 12px 8px; }
+  .panel-hdr h2 { font-size: 14.5px; font-weight: 700; }
+  .panel-hdr p { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+  .rk-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; margin: 2px 4px; border-radius: 12px; cursor: pointer;
+    border: 1px solid transparent; transition: all .12s;
+  }
+  .rk-row:hover { background: var(--panel-soft); }
+  .rk-row.active { background: var(--purple-softer); border-color: #e3d9fb; }
+  .rk-rank { width: 16px; font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; flex-shrink: 0; }
+  .avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
+  .rk-avatar { width: 32px; height: 32px; font-size: 11px; }
+  .rk-info { flex: 1; min-width: 0; }
+  .rk-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rk-sub { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+  .pnl-pill {
+    font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+    padding: 4px 9px; border-radius: 20px; white-space: nowrap;
+  }
+  .view-btn {
+    border: none; background: var(--purple); color: #fff;
+    font-size: 11px; font-weight: 700; padding: 7px 12px; border-radius: 20px;
+    cursor: pointer; white-space: nowrap; transition: background .12s;
+  }
+  .view-btn:hover { background: var(--purple-dark); }
 
-    /* ── Feed panel ───────────────────────────────────────────────────────── */
-    .feed-panel { overflow: hidden; }
-    .feed-hdr { padding: 14px 16px 8px; border-bottom: 1px solid var(--border); }
-    .feed-hdr h2 { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
-    .feed-hdr p  { font-size: 12px; color: var(--muted); }
-    .feed-list   { max-height: 280px; overflow-y: auto; padding: 6px 0; }
-    .feed-item {
-      display: flex; gap: 12px;
-      padding: 11px 16px; margin: 2px 8px;
-      border-radius: 12px; cursor: pointer;
-      border: 1px solid transparent; transition: all .12s;
-    }
-    .feed-item:hover { border-color: var(--border); background: var(--panel2); }
-    .avatar {
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; flex-shrink: 0;
-    }
-    .feed-avatar { width: 32px; height: 32px; font-size: 11.5px; }
-    .feed-body   { flex: 1; min-width: 0; }
-    .feed-title  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .feed-ticker { font-size: 13px; font-weight: 700; }
-    .feed-meta   { font-size: 11.5px; color: var(--muted); }
-    .feed-quote  {
-      font-size: 12.5px; color: #a8afba; margin-top: 2px;
-      font-style: italic; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis;
-    }
-    .feed-ret { text-align: right; flex-shrink: 0; font-family: var(--mono); font-weight: 700; font-size: 13px; }
+  /* ── Chart panel (spans info + ranked columns) ───────────────────────── */
+  .chart-panel { grid-column: 1 / 3; grid-row: 2; padding: 22px 22px 18px; }
+  .chart-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+  .chart-top-left { display: flex; align-items: center; gap: 12px; }
+  .chart-title { display: flex; align-items: center; gap: 8px; }
+  .chart-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--purple); }
+  .chart-top h2 { font-size: 13px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+  .status-badge { font-size: 12px; font-weight: 700; color: var(--purple-dark); display: flex; align-items: center; gap: 6px; }
+  .status-badge .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .toggle-group { display: flex; gap: 4px; background: var(--panel-soft); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+  .toggle-btn { border: none; background: transparent; color: var(--muted); font-family: var(--mono); font-size: 12px; font-weight: 700; padding: 6px 13px; border-radius: 7px; cursor: pointer; transition: all .15s; }
+  .toggle-btn.active { background: var(--purple); color: #fff; }
+  .legend-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { display: flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px 4px 6px; cursor: pointer; transition: opacity .15s; }
+  .chip.off { opacity: .32; }
+  .chip-dot { width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #fff; flex-shrink: 0; }
+  .chip-name { font-size: 11.5px; font-weight: 600; }
+  .chart-wrap { position: relative; height: 300px; }
+  #chart { display: block; }
 
-    /* ── Sidebar ──────────────────────────────────────────────────────────── */
-    .sidebar {
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: 16px; padding: 8px;
-      position: sticky; top: 20px;
-    }
-    .sidebar-hdr { padding: 16px 16px 8px; }
-    .sidebar-hdr h2 { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
-    .sidebar-hdr p  { font-size: 11.5px; color: var(--muted); font-family: var(--mono); }
-    .lb-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 14px; margin: 2px 8px;
-      border-radius: 12px; cursor: pointer;
-      border: 1px solid transparent; transition: all .12s;
-    }
-    .lb-row:hover { background: var(--panel2); border-color: var(--border); }
-    .lb-rank { width: 20px; font-family: var(--mono); font-size: 13px; font-weight: 700; text-align: center; flex-shrink: 0; }
-    .lb-avatar { width: 36px; height: 36px; font-size: 12.5px; }
-    .lb-info { flex: 1; min-width: 0; }
-    .lb-name { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .lb-streak { font-size: 11px; color: var(--muted); margin-top: 1px; }
-    .lb-stats { text-align: right; flex-shrink: 0; }
-    .lb-pnl { font-family: var(--mono); font-weight: 700; font-size: 14px; }
-    .lb-count { font-size: 10.5px; color: var(--muted); }
+  /* ── Chat / idea feed panel ──────────────────────────────────────────── */
+  .chat-panel { grid-column: 3; grid-row: 1 / 3; display: flex; flex-direction: column; max-height: 636px; }
+  .chat-panel .panel-hdr { border-bottom: 1px solid var(--border); }
+  .chat-list { flex: 1; overflow-y: auto; padding: 6px 4px; }
+  .chat-item { padding: 12px 14px; margin: 2px 6px; border-radius: 14px; cursor: pointer; border: 1px solid transparent; transition: all .12s; }
+  .chat-item:hover { background: var(--panel-soft); border-color: var(--border); }
+  .chat-item-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .chat-avatar { width: 24px; height: 24px; font-size: 9.5px; }
+  .chat-name { font-size: 12.5px; font-weight: 700; }
+  .chat-time { font-size: 10.5px; color: var(--muted); margin-left: auto; flex-shrink: 0; }
+  .chat-body { font-size: 12.5px; color: var(--dim); line-height: 1.5; }
+  .chat-body b { color: var(--text); }
+  .chat-tag { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
 
-    /* ── Drawer ───────────────────────────────────────────────────────────── */
-    #overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,.6); backdrop-filter: blur(2px);
-      z-index: 40; display: none;
-    }
-    #overlay.open { display: block; }
-    #drawer {
-      position: fixed; top: 0; right: 0;
-      height: 100vh; width: 420px; max-width: 92vw;
-      background: var(--panel); border-left: 1px solid var(--border);
-      z-index: 41; overflow-y: auto;
-      padding: 28px 24px 48px;
-      box-shadow: -20px 0 60px rgba(0,0,0,.45);
-      transform: translateX(100%); transition: transform .25s ease;
-    }
-    #overlay.open #drawer { transform: translateX(0); }
-    .drawer-top {
-      display: flex; justify-content: space-between;
-      align-items: flex-start; margin-bottom: 20px;
-    }
-    .drawer-user { display: flex; align-items: center; gap: 14px; }
-    .drawer-avatar { width: 52px; height: 52px; font-size: 17px; }
-    .drawer-name { font-size: 17px; font-weight: 800; }
-    .drawer-nick { font-size: 13px; color: var(--dim); }
-    .close-btn {
-      background: #1a1f27; border: 1px solid #262c36; color: var(--dim);
-      width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
-      font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center;
-    }
-    .stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 24px; }
-    .stat-box { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; }
-    .stat-val { font-family: var(--mono); font-weight: 700; font-size: 17px; }
-    .stat-lbl { font-size: 10.5px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: .04em; }
-    .section-lbl { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
-    .pitch-card { border-radius: 14px; padding: 16px; margin-bottom: 26px; }
-    .pitch-top { display: flex; justify-content: space-between; align-items: center; }
-    .pitch-ticker { font-size: 16px; font-weight: 800; }
-    .pitch-ret { font-family: var(--mono); font-weight: 700; font-size: 15px; }
-    .pitch-meta { display: flex; gap: 16px; margin-top: 8px; font-family: var(--mono); font-size: 12.5px; color: var(--dim); }
-    .pitch-quote { margin-top: 10px; font-size: 13px; color: #c3c9d1; font-style: italic; line-height: 1.5; }
-    .hist-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
-    .hist-top { display: flex; justify-content: space-between; align-items: center; }
-    .hist-ticker { font-size: 14px; font-weight: 700; }
-    .hist-ret { font-family: var(--mono); font-weight: 700; font-size: 13px; }
-    .hist-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
-    .hist-quote { font-size: 12.5px; color: var(--dim); font-style: italic; margin-top: 4px; }
+  /* ── Portfolio panel ──────────────────────────────────────────────────── */
+  .portfolio-panel { grid-column: 4; grid-row: 1 / 3; display: flex; flex-direction: column; max-height: 636px; padding: 8px; }
+  .pf-hdr { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 12px; border-bottom: 1px solid var(--border); }
+  .pf-user { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .pf-avatar { width: 30px; height: 30px; font-size: 11px; }
+  .pf-name { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tab-group { display: flex; gap: 3px; background: var(--panel-soft); border: 1px solid var(--border); border-radius: 9px; padding: 3px; flex-shrink: 0; }
+  .tab-btn { border: none; background: transparent; color: var(--muted); font-size: 11.5px; font-weight: 700; padding: 6px 11px; border-radius: 7px; cursor: pointer; }
+  .tab-btn.active { background: var(--purple); color: #fff; }
+  .pf-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; padding: 12px 8px; }
+  .pf-stat { background: var(--panel-soft); border: 1px solid var(--border); border-radius: 10px; padding: 10px 6px; text-align: center; }
+  .pf-stat-val { font-family: var(--mono); font-weight: 700; font-size: 14px; }
+  .pf-stat-lbl { font-size: 9px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: .03em; }
+  .pf-list { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+  .pf-col-hdr { display: flex; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; padding: 6px 6px; }
+  .pf-row { display: flex; align-items: center; gap: 8px; padding: 9px 6px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .pf-row:last-child { border-bottom: none; }
+  .pf-sym { font-weight: 700; flex: 1.2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pf-mid { flex: 1; color: var(--dim); font-family: var(--mono); font-size: 11px; text-align: right; }
+  .pf-pnl { flex: 0.9; text-align: right; font-family: var(--mono); font-weight: 700; }
+  .pf-status { font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 8px; margin-left: 4px; }
 
-    /* ── Utility ──────────────────────────────────────────────────────────── */
-    .pos { color: var(--green); }
-    .neg { color: var(--red); }
-    .empty { padding: 48px 16px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.6; }
+  /* ── Utility ──────────────────────────────────────────────────────────── */
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .pos-bg { background: var(--green-soft); color: var(--green); }
+  .neg-bg { background: var(--red-soft); color: var(--red); }
+  .empty { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.6; }
 
-    /* ── Tablet ───────────────────────────────────────────────────────────── */
-    @media (max-width: 820px) {
-      #app { padding: 20px 20px 48px; }
-      .main-grid { grid-template-columns: 1fr; }
-      .sidebar { position: static; }
-      h1 { font-size: 26px; }
-      .header { align-items: flex-start; flex-direction: column; gap: 14px; }
-      .feed-list { max-height: 380px; }
-    }
-
-    /* ── Phone ────────────────────────────────────────────────────────────── */
-    @media (max-width: 540px) {
-      #app { padding: 14px 12px 48px; }
-      h1 { font-size: 21px; }
-      .subtitle { font-size: 12.5px; }
-      .header { gap: 10px; margin-bottom: 16px; }
-
-      /* Time filters */
-      .time-filters { padding: 3px; gap: 3px; }
-      .tf-btn { padding: 6px 11px; font-size: 12px; border-radius: 7px; }
-
-      /* Chart panel */
-      .chart-panel { padding: 14px 12px 10px; margin-bottom: 14px; }
-      .chart-top { flex-direction: column; align-items: flex-start; gap: 10px; }
-      .chart-top-left { flex-wrap: wrap; gap: 8px; }
-      .chart-top h2 { font-size: 14px; }
-      .chart-wrap { height: 180px; }
-
-      /* Legend chips — horizontal scroll, no wrap */
-      .legend-chips {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        padding-bottom: 4px;
-        scrollbar-width: none;
-      }
-      .legend-chips::-webkit-scrollbar { display: none; }
-      .chip { flex-shrink: 0; padding: 4px 9px 4px 5px; }
-      .chip-name { font-size: 11.5px; }
-      .chip-dot { width: 14px; height: 14px; font-size: 7.5px; }
-
-      /* Feed */
-      .feed-hdr { padding: 12px 14px 8px; }
-      .feed-hdr h2 { font-size: 14px; }
-      .feed-hdr p  { font-size: 11px; }
-      .feed-list { max-height: 300px; }
-      .feed-item { padding: 9px 12px; margin: 2px 4px; gap: 9px; }
-      .feed-avatar { width: 28px; height: 28px; font-size: 10.5px; }
-      .feed-ticker { font-size: 12.5px; }
-      .feed-meta { font-size: 10.5px; }
-      .feed-quote { font-size: 11.5px; }
-      .feed-ret { font-size: 12px; }
-
-      /* Leaderboard sidebar */
-      .sidebar { padding: 4px; }
-      .sidebar-hdr { padding: 12px 12px 6px; }
-      .sidebar-hdr h2 { font-size: 14px; }
-      .sidebar-hdr p { font-size: 10.5px; }
-      .lb-row { padding: 9px 10px; margin: 2px 4px; gap: 8px; }
-      .lb-rank { font-size: 12px; width: 18px; }
-      .lb-avatar { width: 30px; height: 30px; font-size: 10.5px; }
-      .lb-name { font-size: 12.5px; }
-      .lb-streak { font-size: 10px; }
-      .lb-pnl { font-size: 13px; }
-      .lb-count { font-size: 10px; }
-
-      /* Drawer — full screen on mobile */
-      #drawer {
-        width: 100vw;
-        max-width: 100vw;
-        padding: 20px 16px 48px;
-        border-left: none;
-        border-top: 1px solid var(--border);
-      }
-      .drawer-avatar { width: 44px; height: 44px; font-size: 14px; }
-      .drawer-name { font-size: 15px; }
-      .drawer-nick { font-size: 12px; }
-      .stat-grid { gap: 6px; }
-      .stat-box { padding: 10px 8px; }
-      .stat-val { font-size: 14px; }
-      .stat-lbl { font-size: 9.5px; }
-      .pitch-ticker { font-size: 14px; }
-      .pitch-ret { font-size: 13.5px; }
-      .pitch-meta { font-size: 11.5px; gap: 10px; }
-    }
-  </style>
+  /* ── Responsive ───────────────────────────────────────────────────────── */
+  @media (max-width: 1180px) {
+    .top-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto; }
+    .info-panel { grid-column: 1; grid-row: 1; }
+    .ranked-panel { grid-column: 2; grid-row: 1; }
+    .chart-panel { grid-column: 1 / 3; grid-row: 2; }
+    .chat-panel { grid-column: 1; grid-row: 3; max-height: 420px; }
+    .portfolio-panel { grid-column: 2; grid-row: 3; max-height: 420px; }
+  }
+  @media (max-width: 760px) {
+    .topbar { padding: 12px 16px; }
+    #app { padding: 16px 14px 48px; }
+    .top-grid { grid-template-columns: 1fr; grid-template-rows: none; gap: 14px; }
+    .info-panel, .ranked-panel, .chart-panel, .chat-panel, .portfolio-panel { grid-column: 1; grid-row: auto; }
+    .ranked-panel, .chat-panel, .portfolio-panel { max-height: 360px; }
+    .chart-wrap { height: 220px; }
+    .chart-top { flex-direction: column; align-items: flex-start; }
+  }
+</style>
 </head>
 <body>
-<div id="app">
 
-  <!-- Header -->
-  <div class="header">
-    <div>
-      <div class="live-badge">
-        <span class="live-dot"></span>
-        <span class="live-text">Live simulation</span>
-      </div>
-      <h1>Alpha Chat 📈</h1>
-      <p class="subtitle">Friends drop stock calls in Telegram — the bot auto-sims the trade. This is who's actually printing.</p>
-    </div>
-    <div class="time-filters">
-      <button class="tf-btn" data-tf="1W" onclick="setTF('1W')">1W</button>
-      <button class="tf-btn" data-tf="1M" onclick="setTF('1M')">1M</button>
-      <button class="tf-btn active" data-tf="ALL" onclick="setTF('ALL')">ALL</button>
-    </div>
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">📈</div>
+    <div class="brand-name">Alpha Chat</div>
   </div>
-
-  <!-- Main grid -->
-  <div class="main-grid">
-
-    <!-- Left column -->
-    <div>
-      <!-- Chart -->
-      <div class="panel chart-panel">
-        <div class="chart-top">
-          <div class="chart-top-left">
-            <h2>Performance by trader</h2>
-            <div class="mode-toggle">
-              <button class="mode-btn active" data-mode="$" onclick="setMode('$')">$</button>
-              <button class="mode-btn" data-mode="%" onclick="setMode('%')">%</button>
-            </div>
-          </div>
-          <div class="legend-chips" id="chips"></div>
-        </div>
-        <div class="chart-wrap">
-          <canvas id="chart"></canvas>
-        </div>
-      </div>
-
-      <!-- Feed -->
-      <div class="panel feed-panel">
-        <div class="feed-hdr">
-          <h2>Idea feed</h2>
-          <p>every call posted to the chat, most recent first</p>
-        </div>
-        <div class="feed-list" id="feed"></div>
-      </div>
-    </div>
-
-    <!-- Sidebar -->
-    <div class="sidebar">
-      <div class="sidebar-hdr">
-        <h2>Leaderboard</h2>
-        <p>ranked by total return</p>
-      </div>
-      <div id="lb"></div>
-    </div>
-
+  <div class="live-pill">
+    <span class="live-dot"></span>
+    <span>Live simulation</span>
   </div>
 </div>
 
-<!-- Drawer overlay -->
-<div id="overlay" onclick="handleOverlay(event)">
-  <div id="drawer" onclick="event.stopPropagation()">
-    <div id="drawer-body"></div>
+<div id="app">
+  <div class="top-grid">
+
+    <!-- Info panel -->
+    <div class="panel info-panel">
+      <h1>Idea Leaderboard</h1>
+      <p class="sub">Friends drop stock calls in Telegram — the bot auto-sims the trade. This is who's actually printing.</p>
+      <div class="meta-row">
+        <div class="meta-icon">👥</div>
+        <div class="meta-label">Traders</div>
+        <div class="meta-val" id="meta-traders">—</div>
+      </div>
+      <div class="meta-row">
+        <div class="meta-icon">🎯</div>
+        <div class="meta-label">Rule</div>
+        <div class="meta-val">$1,000 fixed size · 10d default hold</div>
+      </div>
+      <div class="meta-row">
+        <div class="meta-icon">💬</div>
+        <div class="meta-label">Source</div>
+        <div class="meta-val">Telegram group calls</div>
+      </div>
+    </div>
+
+    <!-- Ranked panel -->
+    <div class="panel ranked-panel">
+      <div class="panel-hdr">
+        <h2>Leaderboard</h2>
+        <p>ranked by total P&amp;L</p>
+      </div>
+      <div id="ranked"></div>
+    </div>
+
+    <!-- Chart panel -->
+    <div class="panel chart-panel">
+      <div class="chart-top">
+        <div class="chart-top-left">
+          <div class="chart-title">
+            <span class="chart-dot"></span>
+            <h2>Total Account Value</h2>
+          </div>
+          <div class="toggle-group">
+            <button class="toggle-btn active" data-mode="$" onclick="setMode('$')">$</button>
+            <button class="toggle-btn" data-mode="%" onclick="setMode('%')">%</button>
+          </div>
+          <div class="toggle-group">
+            <button class="toggle-btn active" data-tf="ALL" onclick="setTF('ALL')">ALL</button>
+            <button class="toggle-btn" data-tf="1M" onclick="setTF('1M')">1M</button>
+            <button class="toggle-btn" data-tf="1W" onclick="setTF('1W')">1W</button>
+          </div>
+        </div>
+        <div class="status-badge" id="status-badge"></div>
+      </div>
+      <div class="legend-chips" id="chips" style="margin-bottom:12px;"></div>
+      <div class="chart-wrap">
+        <canvas id="chart"></canvas>
+      </div>
+    </div>
+
+    <!-- Chat / idea feed panel -->
+    <div class="panel chat-panel">
+      <div class="panel-hdr">
+        <h2>Idea Feed</h2>
+        <p>every call posted to the chat, most recent first</p>
+      </div>
+      <div class="chat-list" id="chat"></div>
+    </div>
+
+    <!-- Portfolio panel -->
+    <div class="panel portfolio-panel">
+      <div class="pf-hdr">
+        <div class="pf-user" id="pf-user"></div>
+        <div class="tab-group">
+          <button class="tab-btn active" data-tab="positions" onclick="setTab('positions')">Positions</button>
+          <button class="tab-btn" data-tab="orders" onclick="setTab('orders')">Orders</button>
+        </div>
+      </div>
+      <div class="pf-stats" id="pf-stats"></div>
+      <div class="pf-list" id="pf-list"></div>
+    </div>
+
   </div>
 </div>
 
 <script>
-// ── Avatar helper ─────────────────────────────────────────────────────────────
-// Returns an HTML string for a circular avatar — photo if available, else initials.
-// cls  : CSS size class (feed-avatar, lb-avatar, drawer-avatar)
-// obj  : object with {photo_url, initials, color}
-// bw   : border width in px (default 1.5)
-function avatarEl(obj, cls, bw = 1.5) {
-  const border = `${bw}px solid ${obj.color}`;
-  const initDiv = `<div class="avatar ${cls}" style="background:${obj.color}22;border:${border};color:${obj.color}">${obj.initials}</div>`;
+// ── Avatar helper ────────────────────────────────────────────────────────────
+function avatarEl(obj, cls) {
+  const border = `1.5px solid ${obj.color}`;
+  const initDiv = `<div class="avatar ${cls}" style="background:${obj.color};color:#fff">${obj.initials}</div>`;
   if (!obj.photo_url) return initDiv;
   return `<div class="avatar ${cls}" style="border:${border};overflow:hidden;padding:0;background:${obj.color}22">` +
     `<img src="${obj.photo_url}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" ` +
-    `onerror="this.parentElement.style.padding='';this.parentElement.innerHTML='${obj.initials}'">` +
+    `onerror="this.parentElement.style.padding='';this.parentElement.style.background='${obj.color}';this.parentElement.innerHTML='${obj.initials}'">` +
     `</div>`;
 }
 
-// ── State ──────────────────────────────────────────────────────────────────────
+// ── State ──────────────────────────────────────────────────────────────────
 const S = {
-  data:      null,   // API response {users, feed}
-  tf:        'ALL',  // '1W' | '1M' | 'ALL'
-  mode:      '$',    // '$' | '%'
-  hidden:    new Set(),
-  drawer:    null,   // telegram_user_id | null
-  chart:     null,
+  data:     null,
+  tf:       'ALL',
+  mode:     '$',
+  hidden:   new Set(),
+  selected: null,
+  tab:      'positions',
+  chart:    null,
 };
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const EMOJI = {
   BTC:'₿', ETH:'⟠', SOL:'◎', DOGE:'🐕', XRP:'💧',
   AAPL:'🍎', TSLA:'🚗', NVDA:'💻', MSFT:'☁️', AMZN:'📦',
@@ -422,10 +324,7 @@ const EMOJI = {
   ARM:'💻', SMCI:'🖥️', NOW:'☁️', UBER:'🚗', HOOD:'📊',
   RBLX:'🎮', SPOT:'🎵', DIS:'🏰', BA:'✈️', F:'🚗',
 };
-
-function tEmoji(ticker, dir) {
-  return EMOJI[ticker] || (dir === 'long' ? '📈' : '📉');
-}
+function tEmoji(ticker, dir) { return EMOJI[ticker] || (dir === 'long' ? '📈' : '📉'); }
 
 function timeAgo(iso) {
   if (!iso) return '';
@@ -437,32 +336,37 @@ function timeAgo(iso) {
   if (days < 31) return Math.floor(days / 7) + 'w ago';
   return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
 }
-
-function fmtPnl(v) {
-  if (v == null) return '—';
-  return (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2);
-}
-function fmtPct(v) {
-  if (v == null) return '—';
-  return (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
-}
+function fmtPnl(v) { if (v == null) return '—'; return (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2); }
+function fmtPct(v) { if (v == null) return '—'; return (v >= 0 ? '+' : '') + v.toFixed(1) + '%'; }
 function pnlCls(v) { return v == null ? '' : v >= 0 ? 'pos' : 'neg'; }
-function pnlColor(v) { return v == null ? '#8b93a1' : v >= 0 ? '#34d399' : '#f87171'; }
-
+function pnlBgCls(v) { return v == null ? '' : v >= 0 ? 'pos-bg' : 'neg-bg'; }
 function firstName(name) { return (name || '').trim().split(' ')[0]; }
-
-function streakLabel(n) {
-  if (!n) return '—';
-  return n > 0 ? `🔥 ${n} win streak` : `${Math.abs(n)} loss streak`;
-}
-
 function xLabel(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
 }
 
-// ── Chart plugins ─────────────────────────────────────────────────────────────
+// ── Market status (America/New_York, Mon–Fri 9:30–16:00) ────────────────────
+function marketStatus() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone:'America/New_York', hour12:false, weekday:'short', hour:'2-digit', minute:'2-digit'
+  }).formatToParts(new Date());
+  const map = {}; parts.forEach(p => map[p.type] = p.value);
+  const mins = parseInt(map.hour,10) * 60 + parseInt(map.minute,10);
+  const isWeekday = !['Sat','Sun'].includes(map.weekday);
+  if (!isWeekday) return {label:'Market Closed', color:'#a39fb0'};
+  if (mins < 9*60+30) return {label:'Pre-Market', color:'#7c3aed'};
+  if (mins >= 16*60)  return {label:'After Hours', color:'#a39fb0'};
+  return {label:'Market Open', color:'#16a34a'};
+}
+function renderStatus() {
+  const st = marketStatus();
+  document.getElementById('status-badge').innerHTML =
+    `<span class="dot" style="background:${st.color}"></span>${st.label}`;
+}
+
+// ── Chart plugins ─────────────────────────────────────────────────────────
 const zeroPlugin = {
   id: 'zeroLine',
   beforeDatasetsDraw(chart) {
@@ -471,27 +375,20 @@ const zeroPlugin = {
     const y0 = y.getPixelForValue(0);
     if (y0 < ca.top || y0 > ca.bottom) return;
     ctx.save();
-    ctx.strokeStyle = '#3a4250';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([7, 9]);
-    ctx.beginPath();
-    ctx.moveTo(ca.left, y0);
-    ctx.lineTo(ca.right, y0);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
+    ctx.strokeStyle = '#d8d4e8'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 8]);
+    ctx.beginPath(); ctx.moveTo(ca.left, y0); ctx.lineTo(ca.right, y0); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
   }
 };
 
 const endLabelPlugin = {
   id: 'endLabels',
   afterDraw(chart) {
-    if (window.innerWidth <= 540) return;
+    if (window.innerWidth <= 760) return;
     if (!S.data) return;
     const {ctx, chartArea: ca} = chart;
     if (!ca) return;
-
-    // Collect last visible point per dataset
     const pts = [];
     chart.data.datasets.forEach((ds, i) => {
       const meta = chart.getDatasetMeta(i);
@@ -507,10 +404,8 @@ const endLabelPlugin = {
       pts.push({y: last.y, user, color: ds.borderColor});
     });
     if (!pts.length) return;
-
-    // Spread labels vertically to avoid overlap
     pts.sort((a, b) => a.y - b.y);
-    const GAP = 26;
+    const GAP = 24;
     for (let pass = 0; pass < 40; pass++) {
       let moved = false;
       for (let k = 1; k < pts.length; k++) {
@@ -523,23 +418,15 @@ const endLabelPlugin = {
       }
       if (!moved) break;
     }
-
     ctx.save();
     pts.forEach(({y, user, color}) => {
       const x = ca.right + 8;
-
-      // Avatar circle
       ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(x + 12, y, 12, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#0a0c10';
-      ctx.font = 'bold 8.5px IBM Plex Mono, monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(user.initials, x + 12, y);
-
-      // P&L text
+      ctx.beginPath(); ctx.arc(x + 11, y, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 8px IBM Plex Mono, monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(user.initials, x + 11, y);
       let label;
       if (S.mode === '%') {
         const notional = Math.max((user.idea_count || 0) * 1000, 1000);
@@ -548,24 +435,21 @@ const endLabelPlugin = {
       } else {
         label = (user.pnl >= 0 ? '+$' : '-$') + Math.abs(user.pnl).toFixed(0);
       }
-      ctx.fillStyle = pnlColor(user.pnl);
+      ctx.fillStyle = user.pnl >= 0 ? '#16a34a' : '#e11d48';
       ctx.font = 'bold 11px IBM Plex Mono, monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(label, x + 28, y);
+      ctx.fillText(label, x + 25, y);
     });
     ctx.restore();
   }
 };
 
-// ── Chart data builder ────────────────────────────────────────────────────────
+// ── Chart data ────────────────────────────────────────────────────────────
 function buildChartData() {
   const {data, tf, mode, hidden} = S;
-
-  // Union of all dates across all users, sorted ascending
   const dateSet = new Set();
   data.users.forEach(u => u.equity_curve.forEach(p => dateSet.add(p.date)));
   let dates = [...dateSet].sort();
-
   if (tf === '1W') dates = dates.slice(-7);
   if (tf === '1M') dates = dates.slice(-30);
 
@@ -573,26 +457,16 @@ function buildChartData() {
     const byDate = {};
     u.equity_curve.forEach(p => { byDate[p.date] = p.equity; });
     let vals = dates.map(d => byDate[d] ?? null);
-
     if (mode === '%') {
-      // Percentage return on total deployed notional
       const notional = Math.max((u.idea_count || 0) * 1000, 1000);
       vals = vals.map(v => v != null ? (v / notional) * 100 : null);
     }
-
     return {
-      label:           u.display_name,
-      data:            vals,
-      borderColor:     u.color,
-      backgroundColor: 'transparent',
-      tension:         0.3,
-      pointRadius:     0,
-      borderWidth:     2.5,
-      spanGaps:        true,
-      hidden:          hidden.has(u.telegram_user_id),
+      label: u.display_name, data: vals, borderColor: u.color,
+      backgroundColor: 'transparent', tension: 0.3, pointRadius: 0,
+      borderWidth: 2.5, spanGaps: true, hidden: hidden.has(u.telegram_user_id),
     };
   });
-
   return {labels: dates, datasets};
 }
 
@@ -600,25 +474,19 @@ function initChart() {
   if (S.chart) S.chart.destroy();
   const ctx = document.getElementById('chart').getContext('2d');
   const {labels, datasets} = buildChartData();
-  const isMobile = window.innerWidth <= 540;
-
+  const isMobile = window.innerWidth <= 760;
   S.chart = new Chart(ctx, {
     type: 'line',
     data: {labels, datasets},
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: {duration: 350},
+      responsive: true, maintainAspectRatio: false, animation: {duration: 350},
       interaction: {mode: 'index', intersect: false},
-      layout: {padding: {right: isMobile ? 8 : 130, left: 2, top: 10, bottom: 4}},
+      layout: {padding: {right: isMobile ? 8 : 120, left: 2, top: 10, bottom: 4}},
       plugins: {
         legend: {display: false},
         tooltip: {
-          backgroundColor: '#1a1f27',
-          borderColor: '#262c36',
-          borderWidth: 1,
-          titleColor: '#e8eaed',
-          bodyColor: '#8b93a1',
+          backgroundColor: '#ffffff', borderColor: '#eae7f3', borderWidth: 1,
+          titleColor: '#181521', bodyColor: '#6b6478',
           titleFont: {family: 'Sora, sans-serif', weight: '700', size: 13},
           bodyFont: {family: 'IBM Plex Mono, monospace', size: 12},
           padding: 12,
@@ -637,26 +505,21 @@ function initChart() {
       scales: {
         x: {
           ticks: {
-            color: '#5b6472',
-            font: {family: 'IBM Plex Mono, monospace', size: 11},
-            maxTicksLimit: 6,
-            maxRotation: 0,
+            color: '#a39fb0', font: {family: 'IBM Plex Mono, monospace', size: 11},
+            maxTicksLimit: 6, maxRotation: 0,
             callback(val) { return xLabel(this.getLabelForValue(val)); }
           },
-          grid: {color: '#1f242c', lineWidth: 1.5},
-          border: {color: '#1f242c'},
+          grid: {color: '#f0eef7', lineWidth: 1}, border: {color: '#eae7f3'},
         },
         y: {
           ticks: {
-            color: '#8b93a1',
-            font: {family: 'IBM Plex Mono, monospace', size: 12, weight: '600'},
+            color: '#6b6478', font: {family: 'IBM Plex Mono, monospace', size: 12, weight: '600'},
             callback(v) {
               if (S.mode === '%') return (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
               return (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(0);
             }
           },
-          grid: {color: '#1f242c', lineWidth: 1.5},
-          border: {color: '#1f242c'},
+          grid: {color: '#f0eef7', lineWidth: 1}, border: {color: '#eae7f3'},
         }
       }
     },
@@ -667,24 +530,21 @@ function initChart() {
 function refreshChart() {
   if (!S.chart) return;
   const {labels, datasets} = buildChartData();
-  S.chart.data.labels = labels;
-  S.chart.data.datasets = datasets;
+  S.chart.data.labels = labels; S.chart.data.datasets = datasets;
   S.chart.update();
 }
 
-// ── Controls ──────────────────────────────────────────────────────────────────
+// ── Controls ──────────────────────────────────────────────────────────────
 function setTF(tf) {
   S.tf = tf;
-  document.querySelectorAll('.tf-btn').forEach(b => b.classList.toggle('active', b.dataset.tf === tf));
+  document.querySelectorAll('.toggle-btn[data-tf]').forEach(b => b.classList.toggle('active', b.dataset.tf === tf));
   refreshChart();
 }
-
 function setMode(m) {
   S.mode = m;
-  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+  document.querySelectorAll('.toggle-btn[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
   refreshChart();
 }
-
 function toggleUser(uid) {
   if (S.hidden.has(uid)) S.hidden.delete(uid); else S.hidden.add(uid);
   document.querySelectorAll('.chip').forEach(el => {
@@ -692,52 +552,49 @@ function toggleUser(uid) {
   });
   refreshChart();
 }
-
-// ── Rendering ─────────────────────────────────────────────────────────────────
-function renderChips() {
-  const el = document.getElementById('chips');
-  el.innerHTML = '';
-  S.data.users.forEach(u => {
-    const btn = document.createElement('button');
-    btn.className = 'chip';
-    btn.dataset.uid = u.telegram_user_id;
-    btn.onclick = () => toggleUser(u.telegram_user_id);
-    btn.innerHTML = `
-      <span class="chip-dot" style="background:${u.color}">${u.initials}</span>
-      <span class="chip-name">${firstName(u.display_name)}</span>`;
-    el.appendChild(btn);
-  });
+function setTab(tab) {
+  S.tab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  renderPortfolio();
+}
+function selectUser(uid) {
+  S.selected = uid;
+  renderRanked();
+  renderPortfolio();
 }
 
-function renderLeaderboard() {
-  const el = document.getElementById('lb');
+// ── Rendering ─────────────────────────────────────────────────────────────
+function renderChips() {
+  const el = document.getElementById('chips');
+  el.innerHTML = S.data.users.map(u => `
+    <button class="chip" data-uid="${u.telegram_user_id}" onclick="toggleUser('${u.telegram_user_id}')">
+      <span class="chip-dot" style="background:${u.color}">${u.initials}</span>
+      <span class="chip-name">${firstName(u.display_name)}</span>
+    </button>`).join('');
+}
+
+function renderRanked() {
+  const el = document.getElementById('ranked');
+  document.getElementById('meta-traders').textContent = S.data.users.length || '—';
   if (!S.data.users.length) {
     el.innerHTML = '<div class="empty">No data yet.<br>Post a trade idea in Telegram to get started!</div>';
     return;
   }
-  const medals = ['🥇','🥈','🥉'];
-  const rankColors = ['#fbbf24','#94a3b8','#cd7f32'];
-  el.innerHTML = S.data.users.map(u => {
-    const rl = medals[u.rank - 1] || u.rank;
-    const rc = rankColors[u.rank - 1] || '#5b6472';
-    return `
-      <div class="lb-row" onclick="openDrawer('${u.telegram_user_id}')">
-        <div class="lb-rank" style="color:${rc}">${rl}</div>
-        ${avatarEl(u, 'lb-avatar')}
-        <div class="lb-info">
-          <div class="lb-name">${u.display_name}</div>
-          <div class="lb-streak">${streakLabel(u.streak)}</div>
-        </div>
-        <div class="lb-stats">
-          <div class="lb-pnl ${pnlCls(u.pnl)}">${fmtPnl(u.pnl)}</div>
-          <div class="lb-count">${u.idea_count} calls</div>
-        </div>
-      </div>`;
-  }).join('');
+  el.innerHTML = S.data.users.map(u => `
+    <div class="rk-row ${S.selected === u.telegram_user_id ? 'active' : ''}" onclick="selectUser('${u.telegram_user_id}')">
+      <div class="rk-rank">#${u.rank}</div>
+      ${avatarEl(u, 'rk-avatar')}
+      <div class="rk-info">
+        <div class="rk-name">${u.display_name}</div>
+        <div class="rk-sub">${(u.win_rate * 100).toFixed(0)}% win rate · ${u.idea_count} calls</div>
+      </div>
+      <span class="pnl-pill ${pnlBgCls(u.pnl)}">${fmtPnl(u.pnl)}</span>
+      <button class="view-btn" onclick="event.stopPropagation(); selectUser('${u.telegram_user_id}')">View</button>
+    </div>`).join('');
 }
 
-function renderFeed() {
-  const el = document.getElementById('feed');
+function renderChat() {
+  const el = document.getElementById('chat');
   if (!S.data.feed.length) {
     el.innerHTML = '<div class="empty">No ideas posted yet.</div>';
     return;
@@ -746,132 +603,105 @@ function renderFeed() {
     const em = tEmoji(it.ticker, it.direction);
     const label = it.company_name || it.ticker || '?';
     return `
-      <div class="feed-item" onclick="openDrawer('${it.telegram_user_id}')">
-        ${avatarEl(it, 'feed-avatar')}
-        <div class="feed-body">
-          <div class="feed-title">
-            <span class="feed-ticker">${em} ${label}</span>
-            <span class="feed-meta">${firstName(it.display_name)} · ${timeAgo(it.submitted_at)}</span>
-          </div>
-          <div class="feed-quote">"${it.raw_text || '...'}"</div>
+      <div class="chat-item" onclick="selectUser('${it.telegram_user_id}')">
+        <div class="chat-item-hdr">
+          ${avatarEl(it, 'chat-avatar')}
+          <span class="chat-name" style="color:${it.color}">${firstName(it.display_name)}</span>
+          <span class="chat-time">${timeAgo(it.submitted_at)}</span>
         </div>
-        <div class="feed-ret ${pnlCls(it.pnl_usd)}">${fmtPnl(it.pnl_usd)}</div>
+        <div class="chat-body"><b>${em} ${label}</b> — "${it.raw_text || '...'}"</div>
+        <span class="chat-tag ${pnlBgCls(it.pnl_usd)}">${fmtPnl(it.pnl_usd)}</span>
       </div>`;
   }).join('');
 }
 
-// ── Drawer ────────────────────────────────────────────────────────────────────
-function openDrawer(uid) {
-  S.drawer = uid;
-  const user = S.data.users.find(u => u.telegram_user_id === uid);
-  if (!user) return;
+function renderPortfolio() {
+  const pfUser = document.getElementById('pf-user');
+  const pfStats = document.getElementById('pf-stats');
+  const pfList = document.getElementById('pf-list');
 
-  const userFeed = S.data.feed.filter(f => f.telegram_user_id === uid);
-  const pitch   = userFeed.find(f => f.status === 'open') || userFeed[0];
-  const history = userFeed.filter(f => f !== pitch).slice(0, 8);
-
-  const winPct  = (user.win_rate * 100).toFixed(0) + '%';
-  const strEmoji = user.streak >= 3 ? '🔥'.repeat(Math.min(user.streak, 5))
-                 : user.streak > 0 ? '🔥' : '—';
-  const strLbl   = user.streak > 0 ? `${user.streak}-win streak` : 'No streak';
-
-  let pitchHtml = '';
-  if (pitch) {
-    const em = tEmoji(pitch.ticker, pitch.direction);
-    const pitchLabel = pitch.company_name || pitch.ticker || '?';
-    pitchHtml = `
-      <div class="section-lbl">Currently pitching</div>
-      <div class="pitch-card" style="background:${user.color}12;border:1px solid ${user.color}55">
-        <div class="pitch-top">
-          <span class="pitch-ticker">${em} ${pitchLabel}</span>
-          <span class="pitch-ret ${pnlCls(pitch.pnl_usd)}">${fmtPnl(pitch.pnl_usd)}</span>
-        </div>
-        <div class="pitch-meta">
-          ${pitch.entry_price   != null ? `<span>Entry $${pitch.entry_price.toFixed(2)}</span>` : ''}
-          ${pitch.current_price != null ? `<span>Now $${pitch.current_price.toFixed(2)}</span>` : ''}
-          <span>${pitch.ticker ? `${pitch.ticker} · ` : ''}${timeAgo(pitch.submitted_at)}</span>
-        </div>
-        <div class="pitch-quote">📩 "${pitch.raw_text || '...'}"</div>
-      </div>`;
+  if (!S.data.users.length) {
+    pfUser.innerHTML = '';
+    pfStats.innerHTML = '';
+    pfList.innerHTML = '<div class="empty">No traders yet.</div>';
+    return;
   }
+  if (!S.selected) S.selected = S.data.users[0].telegram_user_id;
+  const user = S.data.users.find(u => u.telegram_user_id === S.selected) || S.data.users[0];
 
-  const histHtml = history.length ? `
-    <div class="section-lbl">Past calls</div>
-    ${history.map(h => {
-      const he = tEmoji(h.ticker, h.direction);
-      const histLabel = h.company_name || h.ticker || '?';
-      return `
-        <div class="hist-item">
-          <div class="hist-top">
-            <span class="hist-ticker">${he} ${histLabel}</span>
-            <span class="hist-ret ${pnlCls(h.pnl_usd)}">${fmtPnl(h.pnl_usd)}</span>
-          </div>
-          <div class="hist-meta">
-            ${h.ticker ? `${h.ticker} · ` : ''}${timeAgo(h.submitted_at)}
-            ${h.entry_price   != null ? ` · $${h.entry_price.toFixed(2)}` : ''}
-            ${h.current_price != null ? ` → $${h.current_price.toFixed(2)}` : ''}
-          </div>
-          <div class="hist-quote">"${h.raw_text || '...'}"</div>
-        </div>`;
-    }).join('')}` : '';
+  pfUser.innerHTML = `${avatarEl(user, 'pf-avatar')}<div class="pf-name">${user.display_name}</div>`;
 
-  document.getElementById('drawer-body').innerHTML = `
-    <div class="drawer-top">
-      <div class="drawer-user">
-        ${avatarEl(user, 'drawer-avatar', 2)}
-        <div>
-          <div class="drawer-name">${user.display_name}</div>
-          <div class="drawer-nick">"${firstName(user.display_name)}"</div>
-        </div>
-      </div>
-      <button class="close-btn" onclick="closeDrawer()">×</button>
+  const curve = user.equity_curve || [];
+  const today = curve.length >= 2 ? curve[curve.length - 1].equity - curve[curve.length - 2].equity : null;
+
+  pfStats.innerHTML = `
+    <div class="pf-stat">
+      <div class="pf-stat-val ${pnlCls(user.pnl)}">${fmtPnl(user.pnl)}</div>
+      <div class="pf-stat-lbl">Total P&amp;L</div>
     </div>
-
-    <div class="stat-grid">
-      <div class="stat-box">
-        <div class="stat-val ${pnlCls(user.pnl)}">${fmtPnl(user.pnl)}</div>
-        <div class="stat-lbl">Total return</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val">${winPct}</div>
-        <div class="stat-lbl">Win rate</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-val">${strEmoji}</div>
-        <div class="stat-lbl">${strLbl}</div>
-      </div>
+    <div class="pf-stat">
+      <div class="pf-stat-val ${pnlCls(today)}">${today == null ? '—' : fmtPnl(today)}</div>
+      <div class="pf-stat-lbl">Today's P&amp;L</div>
     </div>
+    <div class="pf-stat">
+      <div class="pf-stat-val">${(user.win_rate * 100).toFixed(0)}%</div>
+      <div class="pf-stat-lbl">Win Rate</div>
+    </div>`;
 
-    ${pitchHtml}
-    ${histHtml}
-  `;
+  const userIdeas = S.data.feed.filter(f => f.telegram_user_id === user.telegram_user_id);
 
-  document.getElementById('overlay').classList.add('open');
+  if (S.tab === 'positions') {
+    const open = userIdeas.filter(f => f.status === 'open');
+    if (!open.length) {
+      pfList.innerHTML = '<div class="empty">No open positions.</div>';
+      return;
+    }
+    const values = open.map(f => 1000 + (f.pnl_usd || 0));
+    const totalValue = values.reduce((a, b) => a + b, 0) || 1;
+    pfList.innerHTML = `
+      <div class="pf-col-hdr"><span style="flex:1.2">Symbol</span><span style="flex:1;text-align:right">Weight</span><span style="flex:.9;text-align:right">P&amp;L</span></div>
+      ${open.map((f, i) => `
+        <div class="pf-row">
+          <span class="pf-sym">${tEmoji(f.ticker, f.direction)} ${f.ticker || '?'}</span>
+          <span class="pf-mid">${((values[i] / totalValue) * 100).toFixed(1)}%</span>
+          <span class="pf-pnl ${pnlCls(f.pnl_usd)}">${fmtPnl(f.pnl_usd)}</span>
+        </div>`).join('')}`;
+  } else {
+    if (!userIdeas.length) {
+      pfList.innerHTML = '<div class="empty">No orders yet.</div>';
+      return;
+    }
+    pfList.innerHTML = `
+      <div class="pf-col-hdr"><span style="flex:1.2">Symbol</span><span style="flex:1;text-align:right">Entry → Now</span><span style="flex:.9;text-align:right">P&amp;L</span></div>
+      ${userIdeas.map(f => `
+        <div class="pf-row">
+          <span class="pf-sym">${tEmoji(f.ticker, f.direction)} ${f.ticker || '?'}
+            <span class="pf-status ${f.status === 'open' ? 'pos-bg' : 'neg-bg'}" style="${f.status === 'open' ? '' : 'background:#f0eef7;color:#a39fb0'}">${f.status}</span>
+          </span>
+          <span class="pf-mid">${f.entry_price != null ? '$' + f.entry_price.toFixed(2) : '—'} → ${f.current_price != null ? '$' + f.current_price.toFixed(2) : '—'}</span>
+          <span class="pf-pnl ${pnlCls(f.pnl_usd)}">${fmtPnl(f.pnl_usd)}</span>
+        </div>`).join('')}`;
+  }
 }
 
-function closeDrawer() {
-  S.drawer = null;
-  document.getElementById('overlay').classList.remove('open');
-}
-
-function handleOverlay(e) {
-  if (e.target === document.getElementById('overlay')) closeDrawer();
-}
-
-// ── Bootstrap ─────────────────────────────────────────────────────────────────
+// ── Bootstrap ─────────────────────────────────────────────────────────────
 async function init() {
+  renderStatus();
+  setInterval(renderStatus, 60000);
   try {
     const res = await fetch('/leaderboard/data/leaderboard');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     S.data = await res.json();
+    if (S.data.users.length) S.selected = S.data.users[0].telegram_user_id;
 
     renderChips();
-    renderLeaderboard();
-    renderFeed();
+    renderRanked();
+    renderChat();
+    renderPortfolio();
     initChart();
   } catch (err) {
     console.error('Leaderboard load failed:', err);
-    document.getElementById('lb').innerHTML =
+    document.getElementById('ranked').innerHTML =
       '<div class="empty">⚠️ Couldn\'t load data.<br>Is the server running?</div>';
   }
 }
