@@ -1,30 +1,21 @@
 import asyncio
-import os
 from logging.config import fileConfig
 
-from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-load_dotenv()
+# Go through db.config.settings so the private-URL preference and the
+# postgresql:// -> postgresql+asyncpg:// scheme fix both apply here too.
+from db.config import settings
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Inject DATABASE_URL from environment so alembic.ini stays secret-free.
-# Railway supplies postgres:// or postgresql:// — asyncpg requires the
-# postgresql+asyncpg:// scheme (mirrors the validator in db/config.py).
-database_url = os.environ.get("DATABASE_URL", "")
-if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
-elif database_url.startswith("postgresql://"):
-    database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # Import Base and every model module so SQLAlchemy's mapper registry is fully
 # populated before autogenerate inspects target_metadata.
