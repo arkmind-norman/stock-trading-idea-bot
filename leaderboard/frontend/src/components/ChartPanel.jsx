@@ -45,7 +45,7 @@ function buildChartData(users, tf, mode, hidden) {
 }
 
 export default function ChartPanel({ users }) {
-  const [mode, setMode] = useState('$');
+  const [mode, setMode] = useState('%');
   const [tf, setTf] = useState('ALL');
   const [hidden, setHidden] = useState(() => new Set());
   const [status, setStatus] = useState(marketStatus());
@@ -91,7 +91,7 @@ export default function ChartPanel({ users }) {
     maintainAspectRatio: false,
     animation: { duration: 350 },
     interaction: { mode: 'index', intersect: false },
-    layout: { padding: { right: isMobile ? 8 : 160, left: 2, top: 10, bottom: 4 } },
+    layout: { padding: { right: isMobile ? 100 : 160, left: 2, top: 10, bottom: 4 } },
     plugins: {
       legend: { display: false },
       tooltip: {

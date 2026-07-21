@@ -32,10 +32,6 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-const AVATAR_R = 16;
-const PILL_H = 32;
-const PILL_PAD = 14;
-
 /**
  * Draws a solid-color pill (white bold value text) with a circular avatar
  * overlapping its left edge — avatarImages maps telegram_user_id to a
@@ -53,10 +49,18 @@ export function makeEndLabelPlugin(liveRef) {
   return {
     id: 'endLabels',
     afterDraw(chart) {
-      if (window.innerWidth <= 760) return;
       const { users, mode, avatarImages } = liveRef.current;
       const { ctx, chartArea: ca } = chart;
       if (!ca) return;
+
+      // Smaller badges on narrow screens so they still fit in the chart's
+      // reserved right-hand padding without needing to hide them entirely.
+      const isMobile = window.innerWidth <= 760;
+      const AVATAR_R = isMobile ? 11 : 16;
+      const PILL_H = isMobile ? 23 : 32;
+      const PILL_PAD = isMobile ? 8 : 14;
+      const VALUE_FONT = isMobile ? 'bold 10px IBM Plex Mono, monospace' : 'bold 13px IBM Plex Mono, monospace';
+      const INITIALS_FONT = isMobile ? 'bold 8px IBM Plex Mono, monospace' : 'bold 11px IBM Plex Mono, monospace';
 
       const pts = [];
       chart.data.datasets.forEach((ds, i) => {
@@ -96,9 +100,9 @@ export function makeEndLabelPlugin(liveRef) {
           ? (rawVal >= 0 ? '+' : '') + rawVal.toFixed(1) + '%'
           : (rawVal >= 0 ? '+$' : '-$') + Math.abs(rawVal).toFixed(0);
 
-        ctx.font = 'bold 13px IBM Plex Mono, monospace';
+        ctx.font = VALUE_FONT;
         const textWidth = ctx.measureText(label).width;
-        const textGap = 6;
+        const textGap = isMobile ? 4 : 6;
         const pillLeft = cx - AVATAR_R;
         const pillWidth = AVATAR_R * 2 + textGap + textWidth + PILL_PAD;
 
@@ -127,7 +131,7 @@ export function makeEndLabelPlugin(liveRef) {
           ctx.fillStyle = color;
           ctx.fillRect(cx - AVATAR_R, y - AVATAR_R, AVATAR_R * 2, AVATAR_R * 2);
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 11px IBM Plex Mono, monospace';
+          ctx.font = INITIALS_FONT;
           ctx.textAlign = 'center';
           ctx.fillText(user.initials, cx, y);
         }

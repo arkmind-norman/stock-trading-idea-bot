@@ -121,7 +121,12 @@ a { color: var(--purple); }
 
 /* ── Chart panel — prioritized, fills remaining main-column height ──── */
 .chart-panel {
-  flex: 1; min-height: 0;
+  /* Proportional (not fixed) share of main-col's height, alongside
+     .bottom-row below — together they always consume exactly all
+     available space, so there's never a leftover gap regardless of
+     viewport height, and the chart (the priority element) gets the
+     larger share of it. */
+  flex: 3 1 0; min-height: 0;
   display: flex; flex-direction: column;
   padding: 20px 22px 16px;
 }
@@ -144,7 +149,7 @@ a { color: var(--purple); }
 .chart-wrap canvas { display: block; }
 
 /* ── Bottom row: idea feed + portfolio, side by side ─────────────────── */
-.bottom-row { flex-shrink: 0; height: 260px; display: flex; gap: 14px; min-height: 0; }
+.bottom-row { flex: 1.3 1 0; min-height: 190px; display: flex; gap: 14px; }
 
 /* ── Chat / idea feed panel ──────────────────────────────────────────── */
 .chat-panel { flex: 1.3; display: flex; flex-direction: column; min-height: 0; }
@@ -202,7 +207,7 @@ a { color: var(--purple); }
   .info-panel { align-items: flex-start; }
   .chart-panel { flex: none; }
   .chart-wrap { flex: none; height: 300px; }
-  .bottom-row { height: auto; flex-direction: column; }
+  .bottom-row { flex: none; height: auto; flex-direction: column; }
   .chat-panel, .portfolio-panel { flex: none; max-height: 360px; }
   .ranked-panel { margin-top: 14px; max-height: 420px; }
   .rk-list { max-height: 360px; }
