@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 
 from bot.application import application
 from bot.webhook import router as bot_router
@@ -81,3 +82,8 @@ app.include_router(leaderboard_router, prefix="/leaderboard")
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/leaderboard/")
