@@ -29,8 +29,10 @@ a { color: var(--purple); }
 /* ── Header bar ───────────────────────────────────────────────────────── */
 .topbar {
   flex-shrink: 0;
+  height: 60px;
+  box-sizing: border-box;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 28px; background: var(--panel); border-bottom: 1px solid var(--border);
+  padding: 0 28px; background: var(--panel); border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand-mark {
@@ -54,9 +56,15 @@ a { color: var(--purple); }
    body once its content has real intrinsic height (chart-panel/bottom-row
    min-heights), so #app stalled at content size instead of filling the
    viewport. Flexbox's grow algorithm doesn't have that circularity. */
+/* Deterministic height instead of flex-grow: once main-col's children had
+   real min-height floors, flex:1 here stalled at content size a couple of
+   layers down (see bottom-row/chart-panel comments) instead of actually
+   filling body's remaining space, through both a grid *and* a flex attempt
+   at #app itself — calc() against the topbar's now-fixed height sidesteps
+   that entirely rather than fighting the browser's intrinsic-sizing rules
+   further. */
 #app {
-  flex: 1;
-  min-height: 0;
+  height: calc(100vh - 60px);
   max-width: 1680px;
   width: 100%;
   margin: 0 auto;
