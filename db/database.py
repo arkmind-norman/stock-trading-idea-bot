@@ -3,8 +3,10 @@ from sqlalchemy.orm import DeclarativeBase
 
 from db.config import settings
 
-# Railway's TCP proxy is plain TCP — no SSL termination. Don't add SSL.
-_connect_args: dict = {}
+# Explicitly disable SSL — Railway's TCP proxy is plain TCP and doesn't
+# terminate SSL. asyncpg otherwise picks up PGSSLMODE from the environment
+# (injected by Railway's Postgres plugin) and tries SSL, which hangs.
+_connect_args: dict = {"ssl": False}
 
 engine = create_async_engine(settings.DATABASE_URL, connect_args=_connect_args, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
