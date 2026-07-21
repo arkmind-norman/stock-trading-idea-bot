@@ -14,18 +14,19 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from datetime import date, datetime, timezone
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 from typing import Protocol
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 
 from db.config import settings
 from db.database import AsyncSessionLocal
-from db.models import DailyEquity, Idea, Position, PositionStatus
-from simulator.engine import close_position, compute_pnl
+from db.models import DailyEquity, EquitySnapshot, Idea, Position, PositionStatus
+from simulator.engine import calculate_equity as _calculate_equity
+from simulator.engine import close_position
 from simulator.market_data import get_latest_price
 
 logger = logging.getLogger(__name__)
@@ -86,36 +87,8 @@ class _HasStatus(Protocol):
     notional: Decimal
 
 
-def _calculate_equity(
-    positions: list,
-    prices: dict[str, Decimal],
-) -> Decimal:
-    """
-    Sum realised P&L from closed positions and unrealised P&L from open positions.
-    Positions whose ticker is missing from prices are skipped for the unrealised calc.
-    """
-    realized = sum(
-        (
-            p.pnl
-            for p in positions
-            if p.status == PositionStatus.closed and p.pnl is not None
-        ),
-        Decimal("0"),
-    )
-    unrealized = sum(
-        (
-            compute_pnl(
-                p.idea.direction.value,
-                p.entry_price,
-                prices[p.idea.ticker],
-                p.notional,
-            )
-            for p in positions
-            if p.status == PositionStatus.open and p.idea.ticker in prices
-        ),
-        Decimal("0"),
-    )
-    return (realized + unrealized).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+# _calculate_equity is now simulator.engine.calculate_equity, imported above
+# under this name so existing callers/tests in this module are unaffected.
 
 
 # ── Single-user snapshot (called immediately after a new position opens) ───────
@@ -259,6 +232,11 @@ async def run_daily_job() -> None:
                 )
             )
             await session.execute(stmt)
+
+        # ── Step 6: prune intraday snapshots superseded by today's DailyEquity ──
+        await session.execute(
+            delete(EquitySnapshot).where(func.date(EquitySnapshot.ts) < today)
+        )
 
         await session.commit()
 

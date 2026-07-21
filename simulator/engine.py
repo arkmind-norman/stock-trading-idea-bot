@@ -42,6 +42,41 @@ def compute_pnl(
     )
 
 
+def calculate_equity(
+    positions: list,
+    prices: dict[str, Decimal],
+) -> Decimal:
+    """
+    Sum realised P&L from closed positions and unrealised P&L from open positions.
+    Positions whose ticker is missing from prices are skipped for the unrealised calc.
+
+    Shared by the daily close-of-market job and the intraday snapshot job so
+    both compute equity identically.
+    """
+    realized = sum(
+        (
+            p.pnl
+            for p in positions
+            if p.status == PositionStatus.closed and p.pnl is not None
+        ),
+        Decimal("0"),
+    )
+    unrealized = sum(
+        (
+            compute_pnl(
+                p.idea.direction.value,
+                p.entry_price,
+                prices[p.idea.ticker],
+                p.notional,
+            )
+            for p in positions
+            if p.status == PositionStatus.open and p.idea.ticker in prices
+        ),
+        Decimal("0"),
+    )
+    return (realized + unrealized).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+
 async def open_position(idea_id: int) -> OpenedPosition:
     """
     Open a $1 000-notional simulated position for the given idea.

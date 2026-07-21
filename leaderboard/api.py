@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections import defaultdict
+from datetime import datetime, timezone
 from decimal import Decimal
 from itertools import groupby
 from typing import Any
@@ -15,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from db.database import AsyncSessionLocal
 from db.models import (
     DailyEquity,
+    EquitySnapshot,
     Idea,
     IdeaStatus,
     Position,
@@ -148,6 +150,10 @@ async def leaderboard_data() -> dict[str, Any]:
             return {"users": [], "feed": feed}
 
         # ── All equity curves ─────────────────────────────────────────────────
+        # Today's DailyEquity row (if any) is excluded here — today is instead
+        # represented by the finer-grained EquitySnapshot points below, which
+        # get pruned once the daily job finalizes today's DailyEquity tonight.
+        today = datetime.now(timezone.utc).date()
         curve_rows = (
             await session.execute(
                 select(DailyEquity)
@@ -155,10 +161,42 @@ async def leaderboard_data() -> dict[str, Any]:
             )
         ).scalars().all()
         curves_by_user: dict[int, list] = defaultdict(list)
+        prior_close: dict[int, Decimal] = {}
+        today_daily: dict[int, Decimal] = {}
         for r in curve_rows:
-            curves_by_user[r.user_id].append(
-                {"date": str(r.date), "equity": float(r.cumulative_pnl)}
+            if r.date < today:
+                curves_by_user[r.user_id].append(
+                    {"date": str(r.date), "equity": float(r.cumulative_pnl)}
+                )
+                prior_close[r.user_id] = r.cumulative_pnl
+            elif r.date == today:
+                today_daily[r.user_id] = r.cumulative_pnl
+
+        # ── Today's intraday snapshots ──────────────────────────────────────────
+        intraday_rows = (
+            await session.execute(
+                select(EquitySnapshot)
+                .where(func.date(EquitySnapshot.ts) == today)
+                .order_by(EquitySnapshot.user_id, EquitySnapshot.ts.asc())
             )
+        ).scalars().all()
+        latest_today: dict[int, Decimal] = {}
+        for s in intraday_rows:
+            curves_by_user[s.user_id].append(
+                {"date": s.ts.isoformat(), "equity": float(s.cumulative_pnl)}
+            )
+            latest_today[s.user_id] = s.cumulative_pnl  # ascending order — last wins
+
+        # Users with a today's-DailyEquity row (written immediately when a new
+        # idea opens) but no intraday snapshot yet — e.g. before market open —
+        # still need a point for today so their line doesn't just stop at
+        # yesterday's close.
+        for user_id, pnl in today_daily.items():
+            if user_id not in latest_today:
+                curves_by_user[user_id].append(
+                    {"date": datetime.now(timezone.utc).isoformat(), "equity": float(pnl)}
+                )
+                latest_today[user_id] = pnl
 
         # ── Win stats (closed positions) ──────────────────────────────────────
         win_rows = (
@@ -227,23 +265,36 @@ async def leaderboard_data() -> dict[str, Any]:
                     cached_prices[pt.ticker] = pt.price
 
     # ── Build response ─────────────────────────────────────────────────────────
+    # Rank by the live value (today's latest intraday snapshot when available,
+    # falling back to the last finalized DailyEquity) rather than the DB query
+    # order, so the ranking stays in sync with the chart during market hours.
     users = []
-    for rank, (user, pnl) in enumerate(equity_rows, 1):
+    for user, eod_pnl in equity_rows:
         total, wins = win_by_user.get(user.id, (0, 0))
+        live_pnl = latest_today.get(user.id, eod_pnl)
+        today_pnl = (
+            float(live_pnl - prior_close.get(user.id, Decimal("0")))
+            if user.id in latest_today
+            else None
+        )
         users.append({
-            "rank": rank,
             "telegram_user_id": user.telegram_user_id,
             "username": user.username,
             "display_name": user.display_name,
             "initials": _initials(user.display_name),
             "color": _color(user.id),
             "photo_url": _proxy_photo_url(user),
-            "pnl": float(pnl),
+            "pnl": float(live_pnl),
+            "today_pnl": today_pnl,
             "win_rate": round(wins / total, 4) if total else 0.0,
             "idea_count": total,
             "streak": streak_map.get(user.id, 0),
             "equity_curve": curves_by_user.get(user.id, []),
         })
+
+    users.sort(key=lambda u: u["pnl"], reverse=True)
+    for rank, u in enumerate(users, 1):
+        u["rank"] = rank
 
     feed = []
     for idea, user in feed_rows:

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 
@@ -12,6 +13,7 @@ from db.config import settings
 from db.database import init_db
 from leaderboard.api import router as leaderboard_router
 from simulator.daily_job import run_daily_job
+from simulator.intraday_job import run_intraday_job
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s | %(message)s",
@@ -39,8 +41,20 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
         misfire_grace_time=3600,  # run even if the process was down at trigger time
     )
+    # ── Intraday equity snapshots ────────────────────────────────────────────────
+    # Every 45s while the US market is open; no-op outside market hours.
+    _scheduler.add_job(
+        run_intraday_job,
+        IntervalTrigger(seconds=45),
+        id="intraday_equity_snapshot",
+        replace_existing=True,
+        misfire_grace_time=30,
+    )
     _scheduler.start()
-    logger.info("Scheduler started — daily job fires at 16:30 America/New_York Mon–Fri")
+    logger.info(
+        "Scheduler started — daily job fires at 16:30 America/New_York Mon–Fri, "
+        "intraday snapshots every 45s during market hours"
+    )
 
     # ── Telegram bot ───────────────────────────────────────────────────────────
     await application.initialize()

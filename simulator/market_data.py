@@ -11,6 +11,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict
+from zoneinfo import ZoneInfo
 
 import yfinance as yf
 from sqlalchemy import select
@@ -18,6 +19,17 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from db.database import AsyncSessionLocal
 from db.models import PriceTick
+
+_NY_TZ = ZoneInfo("America/New_York")
+
+
+def is_market_open() -> bool:
+    """True Mon–Fri 9:30–16:00 America/New_York. Ignores US market holidays."""
+    now = datetime.now(_NY_TZ)
+    if now.weekday() >= 5:  # Sat=5, Sun=6
+        return False
+    minutes = now.hour * 60 + now.minute
+    return 9 * 60 + 30 <= minutes < 16 * 60
 
 
 _BARE_DIGITS_RE = re.compile(r"^\d{1,6}$")
@@ -109,6 +121,46 @@ async def get_latest_price(ticker: str) -> Decimal:
             pg_insert(PriceTick)
             .values(ticker=ticker, date=today, price=price)
             .on_conflict_do_nothing()
+        )
+        await session.execute(stmt)
+        await session.commit()
+
+    return price
+
+
+def _fetch_intraday_price_sync(ticker: str) -> Decimal:
+    """Synchronous live-price fetch — intended to run in an executor."""
+    last = yf.Ticker(ticker).fast_info.get("last_price")
+    if last is None:
+        hist = yf.Ticker(ticker).history(period="1d", interval="1m")
+        if hist.empty:
+            raise ValueError(f"yfinance returned no intraday data for {ticker!r}")
+        last = float(hist["Close"].iloc[-1])
+    return Decimal(str(last)).quantize(Decimal("0.0001"))
+
+
+async def get_intraday_price(ticker: str) -> Decimal:
+    """
+    Fetch ticker's current live price directly from yfinance, bypassing the
+    once-per-day PriceTick cache used by get_latest_price(). Used by the
+    intraday snapshot job, which needs a fresh read on every tick rather than
+    the first price seen that day.
+
+    Refreshes today's price_ticks row as a side effect, so other callers of
+    get_latest_price() benefit from the freshest price too.
+    """
+    loop = asyncio.get_event_loop()
+    price = await loop.run_in_executor(None, _fetch_intraday_price_sync, ticker)
+
+    today = datetime.now(timezone.utc).date()
+    async with AsyncSessionLocal() as session:
+        stmt = (
+            pg_insert(PriceTick)
+            .values(ticker=ticker, date=today, price=price)
+            .on_conflict_do_update(
+                index_elements=["ticker", "date"],
+                set_={"price": price},
+            )
         )
         await session.execute(stmt)
         await session.commit()

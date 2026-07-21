@@ -93,3 +93,20 @@ class PriceTick(Base):
     ticker: Mapped[str] = mapped_column(String(16), primary_key=True)
     date: Mapped[date] = mapped_column(Date, primary_key=True)
     price: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+
+
+class EquitySnapshot(Base):
+    """Intraday equity point — many rows per user per trading day.
+
+    DailyEquity holds one permanent point per user per day (written at market
+    close). This table holds the finer-grained points collected during the
+    day so the leaderboard chart can show live movement; rows for a given day
+    are pruned once that day's DailyEquity row has been finalized.
+    """
+    __tablename__ = "equity_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    ts: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    cumulative_pnl: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    cumulative_equity: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)

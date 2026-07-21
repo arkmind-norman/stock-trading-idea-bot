@@ -343,7 +343,12 @@ function pnlBgCls(v) { return v == null ? '' : v >= 0 ? 'pos-bg' : 'neg-bg'; }
 function firstName(name) { return (name || '').trim().split(' ')[0]; }
 function xLabel(dateStr) {
   if (!dateStr) return '';
-  const d = new Date(dateStr + 'T00:00:00');
+  // Today's intraday points are full ISO timestamps (contain 'T'); historical
+  // points are plain "YYYY-MM-DD" dates and need the time appended to parse
+  // in the local timezone instead of UTC.
+  const isIntraday = dateStr.includes('T');
+  const d = isIntraday ? new Date(dateStr) : new Date(dateStr + 'T00:00:00');
+  if (isIntraday) return d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
   return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
 }
 
@@ -393,15 +398,15 @@ const endLabelPlugin = {
     chart.data.datasets.forEach((ds, i) => {
       const meta = chart.getDatasetMeta(i);
       if (meta.hidden) return;
-      let last = null;
+      let last = null, rawVal = null;
       for (let j = meta.data.length - 1; j >= 0; j--) {
         const pt = meta.data[j];
-        if (pt && isFinite(pt.y)) { last = pt; break; }
+        if (pt && isFinite(pt.y)) { last = pt; rawVal = ds.data[j]; break; }
       }
-      if (!last) return;
+      if (!last || rawVal == null) return;
       const user = S.data.users.find(u => u.display_name === ds.label);
       if (!user) return;
-      pts.push({y: last.y, user, color: ds.borderColor});
+      pts.push({y: last.y, rawVal, user, color: ds.borderColor});
     });
     if (!pts.length) return;
     pts.sort((a, b) => a.y - b.y);
@@ -419,7 +424,7 @@ const endLabelPlugin = {
       if (!moved) break;
     }
     ctx.save();
-    pts.forEach(({y, user, color}) => {
+    pts.forEach(({y, rawVal, user, color}) => {
       const x = ca.right + 8;
       ctx.fillStyle = color;
       ctx.beginPath(); ctx.arc(x + 11, y, 11, 0, Math.PI * 2); ctx.fill();
@@ -427,15 +432,12 @@ const endLabelPlugin = {
       ctx.font = 'bold 8px IBM Plex Mono, monospace';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(user.initials, x + 11, y);
-      let label;
-      if (S.mode === '%') {
-        const notional = Math.max((user.idea_count || 0) * 1000, 1000);
-        const pct = (user.pnl / notional) * 100;
-        label = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
-      } else {
-        label = (user.pnl >= 0 ? '+$' : '-$') + Math.abs(user.pnl).toFixed(0);
-      }
-      ctx.fillStyle = user.pnl >= 0 ? '#16a34a' : '#e11d48';
+      // Label reflects the line's actual last plotted value (live, once
+      // intraday snapshots exist for today), not the separate ranking pnl.
+      const label = S.mode === '%'
+        ? (rawVal >= 0 ? '+' : '') + rawVal.toFixed(1) + '%'
+        : (rawVal >= 0 ? '+$' : '-$') + Math.abs(rawVal).toFixed(0);
+      ctx.fillStyle = rawVal >= 0 ? '#16a34a' : '#e11d48';
       ctx.font = 'bold 11px IBM Plex Mono, monospace';
       ctx.textAlign = 'left';
       ctx.fillText(label, x + 25, y);
@@ -567,7 +569,7 @@ function selectUser(uid) {
 function renderChips() {
   const el = document.getElementById('chips');
   el.innerHTML = S.data.users.map(u => `
-    <button class="chip" data-uid="${u.telegram_user_id}" onclick="toggleUser('${u.telegram_user_id}')">
+    <button class="chip ${S.hidden.has(u.telegram_user_id) ? 'off' : ''}" data-uid="${u.telegram_user_id}" onclick="toggleUser('${u.telegram_user_id}')">
       <span class="chip-dot" style="background:${u.color}">${u.initials}</span>
       <span class="chip-name">${firstName(u.display_name)}</span>
     </button>`).join('');
@@ -631,16 +633,13 @@ function renderPortfolio() {
 
   pfUser.innerHTML = `${avatarEl(user, 'pf-avatar')}<div class="pf-name">${user.display_name}</div>`;
 
-  const curve = user.equity_curve || [];
-  const today = curve.length >= 2 ? curve[curve.length - 1].equity - curve[curve.length - 2].equity : null;
-
   pfStats.innerHTML = `
     <div class="pf-stat">
       <div class="pf-stat-val ${pnlCls(user.pnl)}">${fmtPnl(user.pnl)}</div>
       <div class="pf-stat-lbl">Total P&amp;L</div>
     </div>
     <div class="pf-stat">
-      <div class="pf-stat-val ${pnlCls(today)}">${today == null ? '—' : fmtPnl(today)}</div>
+      <div class="pf-stat-val ${pnlCls(user.today_pnl)}">${user.today_pnl == null ? '—' : fmtPnl(user.today_pnl)}</div>
       <div class="pf-stat-lbl">Today's P&amp;L</div>
     </div>
     <div class="pf-stat">
@@ -685,25 +684,48 @@ function renderPortfolio() {
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
+// Data refetches every 5s from our own API (cheap — just a DB read); the
+// backend independently pulls fresh prices from yfinance every ~45s during
+// market hours and persists them, so refreshes in between simply repeat the
+// latest known values until the next backend tick lands.
+function withScrollPreserved(ids, fn) {
+  const positions = ids.map(id => document.getElementById(id)?.scrollTop ?? 0);
+  fn();
+  ids.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollTop = positions[i];
+  });
+}
+
+async function loadData(isFirstLoad) {
+  const res = await fetch('/leaderboard/data/leaderboard');
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  S.data = await res.json();
+  if (isFirstLoad && S.data.users.length) S.selected = S.data.users[0].telegram_user_id;
+
+  renderChips();
+  withScrollPreserved(['ranked', 'chat', 'pf-list'], () => {
+    renderRanked();
+    renderChat();
+    renderPortfolio();
+  });
+  if (isFirstLoad) initChart(); else refreshChart();
+}
+
 async function init() {
   renderStatus();
   setInterval(renderStatus, 60000);
   try {
-    const res = await fetch('/leaderboard/data/leaderboard');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    S.data = await res.json();
-    if (S.data.users.length) S.selected = S.data.users[0].telegram_user_id;
-
-    renderChips();
-    renderRanked();
-    renderChat();
-    renderPortfolio();
-    initChart();
+    await loadData(true);
   } catch (err) {
     console.error('Leaderboard load failed:', err);
     document.getElementById('ranked').innerHTML =
       '<div class="empty">⚠️ Couldn\'t load data.<br>Is the server running?</div>';
+    return;
   }
+  setInterval(() => {
+    loadData(false).catch(err => console.error('Leaderboard refresh failed:', err));
+  }, 5000);
 }
 
 init();
