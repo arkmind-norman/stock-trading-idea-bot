@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -6,6 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from bot.application import application
 from bot.webhook import router as bot_router
@@ -91,6 +93,12 @@ app = FastAPI(title="Stock Trading Idea Bot", lifespan=lifespan)
 
 app.include_router(bot_router, prefix="/bot")
 app.include_router(leaderboard_router, prefix="/leaderboard")
+
+# React build output (leaderboard/frontend, built via `npm run build` into
+# leaderboard/static/). leaderboard/api.py serves static/index.html directly;
+# this just serves the hashed JS/CSS bundle it references.
+_LEADERBOARD_ASSETS = os.path.join(os.path.dirname(__file__), "leaderboard", "static", "assets")
+app.mount("/leaderboard/assets", StaticFiles(directory=_LEADERBOARD_ASSETS), name="leaderboard-assets")
 
 
 @app.get("/health")
