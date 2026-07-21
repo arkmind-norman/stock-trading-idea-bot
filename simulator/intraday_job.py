@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -54,7 +54,10 @@ async def run_intraday_job() -> None:
     if not prices:
         return
 
-    now = datetime.now(timezone.utc)
+    # Naive UTC, matching the rest of the codebase's DateTime columns
+    # (e.g. Position.entry_time) — the equity_snapshots.ts column is
+    # TIMESTAMP WITHOUT TIME ZONE, which asyncpg rejects tz-aware values for.
+    now = datetime.utcnow()
 
     async with AsyncSessionLocal() as session:
         all_positions: list[Position] = (

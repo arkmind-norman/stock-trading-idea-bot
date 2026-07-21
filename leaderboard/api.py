@@ -182,8 +182,11 @@ async def leaderboard_data() -> dict[str, Any]:
         ).scalars().all()
         latest_today: dict[int, Decimal] = {}
         for s in intraday_rows:
+            # s.ts is naive (TIMESTAMP WITHOUT TIME ZONE) but represents UTC —
+            # attach tzinfo explicitly so the browser doesn't parse it as local time.
+            ts_utc = s.ts.replace(tzinfo=timezone.utc)
             curves_by_user[s.user_id].append(
-                {"date": s.ts.isoformat(), "equity": float(s.cumulative_pnl)}
+                {"date": ts_utc.isoformat(), "equity": float(s.cumulative_pnl)}
             )
             latest_today[s.user_id] = s.cumulative_pnl  # ascending order — last wins
 
