@@ -48,22 +48,26 @@ export function makeEndLabelPlugin(users, mode, avatarImages) {
     afterDraw(chart) {
       if (window.innerWidth <= 760) return;
       const { ctx, chartArea: ca } = chart;
-      if (!ca) return;
+      if (!ca) { console.log('[endLabels] no chartArea'); return; }
 
       const pts = [];
       chart.data.datasets.forEach((ds, i) => {
         const meta = chart.getDatasetMeta(i);
+        console.log('[endLabels] ds', i, ds.label, 'hidden=', meta.hidden, 'metaLen=', meta.data.length);
         if (meta.hidden) return;
         let last = null, rawVal = null;
         for (let j = meta.data.length - 1; j >= 0; j--) {
           const pt = meta.data[j];
           if (pt && isFinite(pt.y)) { last = pt; rawVal = ds.data[j]; break; }
         }
+        console.log('[endLabels] last=', last && { x: last.x, y: last.y }, 'rawVal=', rawVal);
         if (!last || rawVal == null) return;
         const user = users.find((u) => u.display_name === ds.label);
+        console.log('[endLabels] user found=', !!user, 'usersCount=', users.length);
         if (!user) return;
         pts.push({ y: last.y, rawVal, user, color: ds.borderColor });
       });
+      console.log('[endLabels] pts.length=', pts.length, 'chartArea=', { top: ca.top, right: ca.right, bottom: ca.bottom });
       if (!pts.length) return;
 
       pts.sort((a, b) => a.y - b.y);
