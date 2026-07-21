@@ -41,33 +41,37 @@ const PILL_PAD = 14;
  * overlapping its left edge — avatarImages maps telegram_user_id to a
  * preloaded, already-complete HTMLImageElement; falls back to initials on a
  * solid-color circle when no photo is loaded yet.
+ *
+ * Takes a ref (not the values directly): react-chartjs-2 registers the
+ * `plugins` prop's functions once at chart creation and does not re-bind
+ * them on prop updates, so a plugin built from plain closures over
+ * users/mode/avatarImages would keep seeing whatever those were on the
+ * very first render forever. Reading live.current instead means the same
+ * stable plugin object always sees the latest values.
  */
-export function makeEndLabelPlugin(users, mode, avatarImages) {
+export function makeEndLabelPlugin(liveRef) {
   return {
     id: 'endLabels',
     afterDraw(chart) {
       if (window.innerWidth <= 760) return;
+      const { users, mode, avatarImages } = liveRef.current;
       const { ctx, chartArea: ca } = chart;
-      if (!ca) { console.log('[endLabels] no chartArea'); return; }
+      if (!ca) return;
 
       const pts = [];
       chart.data.datasets.forEach((ds, i) => {
         const meta = chart.getDatasetMeta(i);
-        console.log('[endLabels] ds', i, ds.label, 'hidden=', meta.hidden, 'metaLen=', meta.data.length);
         if (meta.hidden) return;
         let last = null, rawVal = null;
         for (let j = meta.data.length - 1; j >= 0; j--) {
           const pt = meta.data[j];
           if (pt && isFinite(pt.y)) { last = pt; rawVal = ds.data[j]; break; }
         }
-        console.log('[endLabels] last=', last && { x: last.x, y: last.y }, 'rawVal=', rawVal);
         if (!last || rawVal == null) return;
         const user = users.find((u) => u.display_name === ds.label);
-        console.log('[endLabels] user found=', !!user, 'usersCount=', users.length);
         if (!user) return;
         pts.push({ y: last.y, rawVal, user, color: ds.borderColor });
       });
-      console.log('[endLabels] pts.length=', pts.length, 'chartArea=', { top: ca.top, right: ca.right, bottom: ca.bottom });
       if (!pts.length) return;
 
       pts.sort((a, b) => a.y - b.y);

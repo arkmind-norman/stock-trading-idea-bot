@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -50,6 +50,13 @@ export default function ChartPanel({ users }) {
   const [hidden, setHidden] = useState(() => new Set());
   const [status, setStatus] = useState(marketStatus());
   const [avatarImages, setAvatarImages] = useState({});
+
+  // react-chartjs-2 binds the `plugins` prop's functions once at chart
+  // creation and never re-binds them on updates, so the plugin reads live
+  // values through this ref (kept in sync every render) rather than being
+  // recreated with fresh closures each time users/mode/avatarImages change.
+  const liveRef = useRef({ users, mode, avatarImages });
+  liveRef.current = { users, mode, avatarImages };
 
   useEffect(() => {
     const id = setInterval(() => setStatus(marketStatus()), 60000);
@@ -135,10 +142,10 @@ export default function ChartPanel({ users }) {
     },
   }), [mode, isMobile]);
 
-  const plugins = useMemo(
-    () => [zeroLinePlugin, makeEndLabelPlugin(users, mode, avatarImages)],
-    [users, mode, avatarImages]
-  );
+  // Stable forever — liveRef never changes identity, and the plugin reads
+  // liveRef.current at draw time, so it doesn't need to be recreated.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const plugins = useMemo(() => [zeroLinePlugin, makeEndLabelPlugin(liveRef)], []);
 
   return (
     <div className="panel chart-panel">
