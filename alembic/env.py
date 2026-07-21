@@ -1,13 +1,9 @@
-import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy import create_engine, pool
 
 from alembic import context
 
-# Go through db.config.settings so the private-URL preference and the
-# postgresql:// -> postgresql+asyncpg:// scheme fix both apply here too.
 from db.config import settings
 
 config = context.config
@@ -15,20 +11,24 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-
-# Import Base and every model module so SQLAlchemy's mapper registry is fully
-# populated before autogenerate inspects target_metadata.
 from db.database import Base  # noqa: E402
 import db.models  # noqa: E402, F401
 
 target_metadata = Base.metadata
 
+# Convert asyncpg URL → psycopg2 URL for synchronous Alembic use.
+_db_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://", 1)
+config.set_main_option("sqlalchemy.url", _db_url)
+
+# Railway private-network URLs (.railway.internal) don't need SSL.
+# Public URLs require sslmode=require.
+_internal = any(h in _db_url for h in [".railway.internal", "localhost", "127.0.0.1"])
+_connect_args = {} if _internal else {"sslmode": "require"}
+
 
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url,
+        url=_db_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -38,29 +38,20 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def do_run_migrations(connection):
-    context.configure(
-        connection=connection,
-        target_metadata=target_metadata,
-        compare_type=True,
-    )
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-async def run_async_migrations() -> None:
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
-
-
 def run_migrations_online() -> None:
-    asyncio.run(run_async_migrations())
+    connectable = create_engine(
+        _db_url,
+        poolclass=pool.NullPool,
+        connect_args=_connect_args,
+    )
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
 
 
 if context.is_offline_mode():
