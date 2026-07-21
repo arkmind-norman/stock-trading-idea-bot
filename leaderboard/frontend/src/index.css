@@ -59,6 +59,7 @@ a { color: var(--purple); }
   box-sizing: border-box;
   display: grid;
   grid-template-columns: 1fr 380px;
+  grid-template-rows: minmax(0, 1fr);
   gap: 16px;
 }
 
