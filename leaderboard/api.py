@@ -201,6 +201,28 @@ async def leaderboard_data() -> dict[str, Any]:
                 )
                 latest_today[user_id] = pnl
 
+        # Users with neither an intraday snapshot nor a fresh today's-row
+        # (e.g. outside market hours with no idea posted yet today) still
+        # need a "now" anchor so the line extends flat from the last known
+        # close instead of just stopping there.
+        for user_id, pnl in prior_close.items():
+            if user_id not in latest_today:
+                curves_by_user[user_id].append(
+                    {"date": datetime.now(timezone.utc).isoformat(), "equity": float(pnl)}
+                )
+                latest_today[user_id] = pnl
+
+        # Chart.js can't draw a visible line from a single point (and point
+        # markers are hidden), so if a user's curve still only has one point
+        # (e.g. day one, no prior history), duplicate it at the start of
+        # today so a flat line renders instead of nothing.
+        for user_id, curve in curves_by_user.items():
+            if len(curve) == 1:
+                start_of_today = datetime.now(timezone.utc).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+                curve.insert(0, {"date": start_of_today.isoformat(), "equity": curve[0]["equity"]})
+
         # ── Win stats (closed positions) ──────────────────────────────────────
         win_rows = (
             await session.execute(

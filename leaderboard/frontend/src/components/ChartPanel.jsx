@@ -91,7 +91,7 @@ export default function ChartPanel({ users }) {
     maintainAspectRatio: false,
     animation: { duration: 350 },
     interaction: { mode: 'index', intersect: false },
-    layout: { padding: { right: isMobile ? 100 : 160, left: 2, top: 10, bottom: 4 } },
+    layout: { padding: { right: isMobile ? 78 : 160, left: 2, top: 10, bottom: 4 } },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -119,9 +119,10 @@ export default function ChartPanel({ users }) {
       x: {
         ticks: {
           color: '#a39fb0',
-          font: { family: 'IBM Plex Mono, monospace', size: 11 },
-          maxTicksLimit: 6,
+          font: { family: 'IBM Plex Mono, monospace', size: isMobile ? 9 : 11 },
+          maxTicksLimit: isMobile ? 4 : 6,
           maxRotation: 0,
+          autoSkipPadding: isMobile ? 12 : 0,
           callback(val) { return xLabel(this.getLabelForValue(val)); },
         },
         grid: { color: '#f0eef7', lineWidth: 1 },
