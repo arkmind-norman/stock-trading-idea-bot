@@ -9,7 +9,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.commands import leaderboard_command, myideas_command
-from bot.llm import classify_and_extract
+from bot.llm import TradeIdea, classify_and_extract
 from db.database import AsyncSessionLocal
 from db.models import Direction, Idea, IdeaStatus, User
 from simulator.daily_job import snapshot_user_equity
@@ -72,20 +72,43 @@ async def log_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     # ── Step 2: LLM classify + extract ───────────────────────────────────────
     try:
-        trade_idea = await classify_and_extract(text)
+        trade_ideas = await classify_and_extract(text)
     except Exception:
         logger.exception("LLM call failed for msg %s", msg.message_id)
         return
 
-    if trade_idea is None:
+    if not trade_ideas:
         return  # banter — do nothing
 
     logger.info(
-        "trade_idea detected | ticker=%s dir=%s conf=%.2f target=%s stop=%s",
-        trade_idea.ticker, trade_idea.direction, trade_idea.confidence,
-        trade_idea.target_price, trade_idea.stop_price,
+        "trade_ideas detected | count=%d | %s",
+        len(trade_ideas),
+        ", ".join(
+            f"{ti.ticker}:{ti.direction}:{ti.confidence:.2f}" for ti in trade_ideas
+        ),
     )
 
+    mention = f"@{tg_user.username}" if tg_user.username else tg_user.full_name or str(tg_user.id)
+    display_name = tg_user.full_name or str(tg_user.id)
+    submitted_at = msg.date.replace(tzinfo=None)
+
+    # A message can list several tickers (e.g. a watchlist dump) — each
+    # becomes its own simulated position, processed in order so replies
+    # land in the chat in the same order the tickers were mentioned.
+    for trade_idea in trade_ideas:
+        await _process_trade_idea(msg, context, tg_user, text, trade_idea, mention, display_name, submitted_at)
+
+
+async def _process_trade_idea(
+    msg,
+    context: ContextTypes.DEFAULT_TYPE,
+    tg_user,
+    text: str,
+    trade_idea: TradeIdea,
+    mention: str,
+    display_name: str,
+    submitted_at: datetime,
+) -> None:
     if trade_idea.confidence < _CONFIDENCE_THRESHOLD:
         await msg.reply_text(
             f"Did you mean to suggest a {trade_idea.direction} trade on "
@@ -93,7 +116,7 @@ async def log_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
 
-    # ── Step 3: Resolve ticker (US → Bursa Malaysia fallback via live search) ──
+    # ── Resolve ticker (US → Bursa Malaysia fallback via live search) ────────
     resolved = await resolve_ticker(trade_idea.ticker, company_name=trade_idea.company_name)
     if resolved is None:
         await msg.reply_text(
@@ -109,18 +132,14 @@ async def log_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         trade_idea.ticker = resolved
 
-    # ── Step 4: Instant acknowledgement — sends before price fetch ────────────
+    # ── Instant acknowledgement — sends before price fetch ───────────────────
     arrow = "📈" if trade_idea.direction == "long" else "📉"
-    mention = f"@{tg_user.username}" if tg_user.username else tg_user.full_name or str(tg_user.id)
     ack = await msg.reply_text(
         f"{arrow} <b>{trade_idea.ticker}</b> {trade_idea.direction.upper()} locked in for {mention} — fetching price...",
         parse_mode="HTML",
     )
 
-    # ── Step 5: Persist user + idea ───────────────────────────────────────────
-    submitted_at = msg.date.replace(tzinfo=None)
-    display_name = tg_user.full_name or str(tg_user.id)
-
+    # ── Persist user + idea ────────────────────────────────────────────────
     async with AsyncSessionLocal() as session:
         db_user = await _get_or_create_user(
             session,
@@ -162,7 +181,7 @@ async def log_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         idea_id = idea.id
         db_user_id = db_user.id
 
-    # ── Step 6: Open the simulated position ───────────────────────────────────
+    # ── Open the simulated position ───────────────────────────────────────
     try:
         opened = await open_position(idea_id)
     except Exception:
@@ -180,7 +199,7 @@ async def log_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     except Exception:
         logger.warning("snapshot_user_equity failed for user %d — leaderboard will update at EOD", db_user_id)
 
-    # ── Step 7: Edit ack with full trade confirmation ─────────────────────────
+    # ── Edit ack with full trade confirmation ─────────────────────────────
     lines = [
         f"{arrow} Opened simulated <b>{opened.direction.upper()}</b> on "
         f"<b>{opened.ticker}</b> @ <b>${float(opened.entry_price):,.2f}</b> for {mention}.",
