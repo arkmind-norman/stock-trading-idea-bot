@@ -21,15 +21,45 @@ from db.database import AsyncSessionLocal
 from db.models import PriceTick
 
 _NY_TZ = ZoneInfo("America/New_York")
+_KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")
 
 
 def is_market_open() -> bool:
-    """True Mon–Fri 9:30–16:00 America/New_York. Ignores US market holidays."""
+    """True Mon–Fri 9:30–16:00 America/New_York (US markets). Ignores US market holidays."""
     now = datetime.now(_NY_TZ)
     if now.weekday() >= 5:  # Sat=5, Sun=6
         return False
     minutes = now.hour * 60 + now.minute
     return 9 * 60 + 30 <= minutes < 16 * 60
+
+
+def is_bursa_open() -> bool:
+    """
+    True Mon–Fri during Bursa Malaysia's two trading sessions — 9:00–12:30
+    and 14:30–17:00 Asia/Kuala_Lumpur — excluding the midday lunch break.
+    Ignores Malaysian market holidays.
+    """
+    now = datetime.now(_KL_TZ)
+    if now.weekday() >= 5:
+        return False
+    minutes = now.hour * 60 + now.minute
+    morning = 9 * 60 <= minutes < 12 * 60 + 30
+    afternoon = 14 * 60 + 30 <= minutes < 17 * 60
+    return morning or afternoon
+
+
+def is_ticker_market_open(ticker: str) -> bool:
+    """
+    Dispatches to the right exchange's trading hours based on the ticker's
+    suffix. Bursa Malaysia (.KL) and US markets trade in non-overlapping
+    windows (Malaysia is UTC+8, opposite side of the clock from US Eastern),
+    so a single global "is the market open" check would either miss Bursa's
+    entire session or misreport it as open during US hours when Bursa is
+    actually closed. Everything else defaults to US hours.
+    """
+    if ticker.upper().endswith(".KL"):
+        return is_bursa_open()
+    return is_market_open()
 
 
 _BARE_DIGITS_RE = re.compile(r"^\d{1,6}$")
