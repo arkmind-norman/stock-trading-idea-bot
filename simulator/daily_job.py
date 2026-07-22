@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Protocol
 
@@ -233,9 +233,15 @@ async def run_daily_job() -> None:
             )
             await session.execute(stmt)
 
-        # ── Step 6: prune intraday snapshots superseded by today's DailyEquity ──
+        # ── Step 6: prune only very old intraday snapshots ───────────────────
+        # These are no longer wiped once superseded by today's DailyEquity —
+        # the leaderboard chart plots directly from this snapshot history
+        # (see leaderboard.api) so more days of raw data means a richer,
+        # more natural-looking chart rather than redundant data. Just cap
+        # total retention so the table doesn't grow unbounded.
+        retention_cutoff = today - timedelta(days=180)
         await session.execute(
-            delete(EquitySnapshot).where(func.date(EquitySnapshot.ts) < today)
+            delete(EquitySnapshot).where(func.date(EquitySnapshot.ts) < retention_cutoff)
         )
 
         await session.commit()

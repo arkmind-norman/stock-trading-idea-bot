@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, time as dt_time, timedelta, timezone
 from decimal import Decimal
 from itertools import groupby
 from typing import Any
@@ -150,9 +150,13 @@ async def leaderboard_data() -> dict[str, Any]:
             return {"users": [], "feed": feed}
 
         # ── All equity curves ─────────────────────────────────────────────────
-        # Today's DailyEquity row (if any) is excluded here — today is instead
-        # represented by the finer-grained EquitySnapshot points below, which
-        # get pruned once the daily job finalizes today's DailyEquity tonight.
+        # Built from EquitySnapshot history (no longer pruned day-by-day —
+        # see simulator.daily_job) rather than one point per finalized day,
+        # so the chart shows real intraday movement across many days
+        # instead of every day collapsing into a single flat plot.
+        # DailyEquity only fills days with zero snapshot coverage (e.g.
+        # before this feature existed, or a day with no market-hours
+        # activity at all).
         today = datetime.now(timezone.utc).date()
         curve_rows = (
             await session.execute(
@@ -160,60 +164,102 @@ async def leaderboard_data() -> dict[str, Any]:
                 .order_by(DailyEquity.user_id, DailyEquity.date.asc())
             )
         ).scalars().all()
-        curves_by_user: dict[int, list] = defaultdict(list)
-        prior_close: dict[int, Decimal] = {}
-        today_daily: dict[int, Decimal] = {}
-        for r in curve_rows:
-            if r.date < today:
-                curves_by_user[r.user_id].append(
-                    {"date": str(r.date), "equity": float(r.cumulative_pnl)}
-                )
-                prior_close[r.user_id] = r.cumulative_pnl
-            elif r.date == today:
-                today_daily[r.user_id] = r.cumulative_pnl
 
-        # ── Today's intraday snapshots ──────────────────────────────────────────
-        intraday_rows = (
+        snapshot_rows = (
             await session.execute(
                 select(EquitySnapshot)
-                .where(func.date(EquitySnapshot.ts) == today)
                 .order_by(EquitySnapshot.user_id, EquitySnapshot.ts.asc())
             )
         ).scalars().all()
+
+        points_by_user: dict[int, list[tuple[datetime, float]]] = defaultdict(list)
+        covered_dates_by_user: dict[int, set] = defaultdict(set)
         latest_today: dict[int, Decimal] = {}
-        for s in intraday_rows:
+        for s in snapshot_rows:
             # s.ts is naive (TIMESTAMP WITHOUT TIME ZONE) but represents UTC —
             # attach tzinfo explicitly so the browser doesn't parse it as local time.
             ts_utc = s.ts.replace(tzinfo=timezone.utc)
-            curves_by_user[s.user_id].append(
-                {"date": ts_utc.isoformat(), "equity": float(s.cumulative_pnl)}
-            )
-            latest_today[s.user_id] = s.cumulative_pnl  # ascending order — last wins
+            points_by_user[s.user_id].append((ts_utc, float(s.cumulative_pnl)))
+            covered_dates_by_user[s.user_id].add(ts_utc.date())
+            if ts_utc.date() == today:
+                latest_today[s.user_id] = s.cumulative_pnl  # ascending order — last wins
 
-        # Single shared timestamp for every synthetic "now" anchor point
-        # below — the chart's x-axis is a category scale, so per-user calls
-        # to datetime.now() would each land in a different microsecond and
+        prior_close: dict[int, Decimal] = {}
+        today_daily: dict[int, Decimal] = {}
+        for r in curve_rows:
+            if r.date == today:
+                today_daily[r.user_id] = r.cumulative_pnl
+                continue
+            if r.date < today:
+                prior_close[r.user_id] = r.cumulative_pnl
+            if r.date not in covered_dates_by_user.get(r.user_id, set()):
+                anchor_ts = datetime.combine(r.date, dt_time(21, 0), tzinfo=timezone.utc)
+                points_by_user[r.user_id].append((anchor_ts, float(r.cumulative_pnl)))
+
+        for pts in points_by_user.values():
+            pts.sort(key=lambda p: p[0])
+
+        # ── Adaptive downsampling ────────────────────────────────────────────
+        # More history should mean a richer chart, not a flatter one —
+        # bucket width scales with the overall time span so the line stays
+        # smooth and "natural" whether it's showing one day or several
+        # months. All users share the same bucket boundaries (a fixed
+        # function of absolute time) so their points land on the same
+        # x-axis categories instead of drifting apart.
+        all_ts = [ts for pts in points_by_user.values() for ts, _ in pts]
+        if all_ts:
+            span = max(all_ts) - min(all_ts)
+            if span <= timedelta(days=1):
+                bucket_min = 1
+            elif span <= timedelta(days=3):
+                bucket_min = 5
+            elif span <= timedelta(days=14):
+                bucket_min = 10
+            elif span <= timedelta(days=60):
+                bucket_min = 30
+            else:
+                bucket_min = 60
+        else:
+            bucket_min = 1
+        bucket_secs = bucket_min * 60
+
+        curves_by_user: dict[int, list] = defaultdict(list)
+        for user_id, pts in points_by_user.items():
+            buckets: dict[int, list[float]] = defaultdict(list)
+            bucket_ts: dict[int, datetime] = {}
+            for ts, val in pts:
+                key = int(ts.timestamp() // bucket_secs)
+                buckets[key].append(val)
+                bucket_ts[key] = datetime.fromtimestamp(key * bucket_secs, tz=timezone.utc)
+            for key in sorted(buckets):
+                vals = buckets[key]
+                curves_by_user[user_id].append({
+                    "date": bucket_ts[key].isoformat(),
+                    "equity": sum(vals) / len(vals),
+                })
+
+        # Single shared timestamp for every synthetic "now" anchor point —
+        # the chart's x-axis is a category scale, so per-user calls to
+        # datetime.now() would each land in a different microsecond and
         # become distinct categories, making lines stop at different points
         # instead of all reaching "now" together.
         now_iso = datetime.now(timezone.utc).isoformat()
 
-        # Users with a today's-DailyEquity row (written immediately when a new
-        # idea opens) but no intraday snapshot yet — e.g. before market open —
-        # still need a point for today so their line doesn't just stop at
+        # Every user always gets a live "now" point at the very end so all
+        # lines visibly reach the present moment, using the most current
+        # value available: today's latest snapshot, else today's fresh
+        # DailyEquity (written immediately when a new idea opens), else
         # yesterday's close.
-        for user_id, pnl in today_daily.items():
-            if user_id not in latest_today:
-                curves_by_user[user_id].append({"date": now_iso, "equity": float(pnl)})
-                latest_today[user_id] = pnl
-
-        # Users with neither an intraday snapshot nor a fresh today's-row
-        # (e.g. outside market hours with no idea posted yet today) still
-        # need a "now" anchor so the line extends flat from the last known
-        # close instead of just stopping there.
-        for user_id, pnl in prior_close.items():
-            if user_id not in latest_today:
-                curves_by_user[user_id].append({"date": now_iso, "equity": float(pnl)})
-                latest_today[user_id] = pnl
+        all_user_ids = set(points_by_user) | set(today_daily) | set(prior_close)
+        for user_id in all_user_ids:
+            if user_id in latest_today:
+                live_pnl = latest_today[user_id]
+            elif user_id in today_daily:
+                live_pnl = today_daily[user_id]
+            else:
+                live_pnl = prior_close.get(user_id)
+            if live_pnl is not None:
+                curves_by_user[user_id].append({"date": now_iso, "equity": float(live_pnl)})
 
         # Chart.js can't draw a visible line from a single point (and point
         # markers are hidden), so if a user's curve still only has one point

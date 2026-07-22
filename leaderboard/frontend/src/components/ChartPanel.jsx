@@ -86,6 +86,17 @@ export default function ChartPanel({ users }) {
   const chartData = useMemo(() => buildChartData(users, tf, mode, hidden), [users, tf, mode, hidden]);
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 760;
 
+  // Points now span anywhere from a few minutes to several months, so tick
+  // labels adapt: show a bare time when the whole visible range fits in a
+  // day, otherwise show the date (tooltips always show both).
+  const tickMode = useMemo(() => {
+    const dates = chartData.labels;
+    if (dates.length < 2) return 'time';
+    const parse = (s) => (s.includes('T') ? new Date(s) : new Date(`${s}T00:00:00`));
+    const spanMs = parse(dates[dates.length - 1]) - parse(dates[0]);
+    return spanMs > 36 * 3600 * 1000 ? 'date' : 'time';
+  }, [chartData.labels]);
+
   const options = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -104,7 +115,7 @@ export default function ChartPanel({ users }) {
         bodyFont: { family: 'IBM Plex Mono, monospace', size: 12 },
         padding: 12,
         callbacks: {
-          title(items) { return xLabel(items[0]?.label); },
+          title(items) { return xLabel(items[0]?.label, 'datetime'); },
           label(ctx) {
             const v = ctx.parsed.y;
             if (v == null) return null;
@@ -123,7 +134,7 @@ export default function ChartPanel({ users }) {
           maxTicksLimit: isMobile ? 4 : 6,
           maxRotation: 0,
           autoSkipPadding: isMobile ? 12 : 0,
-          callback(val) { return xLabel(this.getLabelForValue(val)); },
+          callback(val) { return xLabel(this.getLabelForValue(val), tickMode); },
         },
         grid: { color: '#f0eef7', lineWidth: 1 },
         border: { color: '#eae7f3' },
@@ -141,7 +152,7 @@ export default function ChartPanel({ users }) {
         border: { color: '#eae7f3' },
       },
     },
-  }), [mode, isMobile]);
+  }), [mode, isMobile, tickMode]);
 
   // Stable forever — liveRef never changes identity, and the plugin reads
   // liveRef.current at draw time, so it doesn't need to be recreated.

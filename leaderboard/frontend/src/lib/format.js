@@ -35,15 +35,21 @@ export function pnlCls(v) { return v == null ? '' : v >= 0 ? 'pos' : 'neg'; }
 export function pnlBgCls(v) { return v == null ? '' : v >= 0 ? 'pos-bg' : 'neg-bg'; }
 export function firstName(name) { return (name || '').trim().split(' ')[0]; }
 
-export function xLabel(dateStr) {
+/**
+ * mode: 'time' -> "9:34 AM", 'date' -> "Jul 21", 'datetime' -> "Jul 21, 9:34 AM".
+ * Points are usually full ISO timestamps (contain 'T'); a few legacy points
+ * from before intraday history existed are plain "YYYY-MM-DD" dates and need
+ * the time appended to parse in the local timezone instead of UTC.
+ */
+export function xLabel(dateStr, mode = 'time') {
   if (!dateStr) return '';
-  // Today's intraday points are full ISO timestamps (contain 'T'); historical
-  // points are plain "YYYY-MM-DD" dates and need the time appended to parse
-  // in the local timezone instead of UTC.
   const isIntraday = dateStr.includes('T');
   const d = isIntraday ? new Date(dateStr) : new Date(dateStr + 'T00:00:00');
-  if (isIntraday) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (!isIntraday || mode === 'date') return datePart;
+  const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (mode === 'datetime') return `${datePart}, ${timePart}`;
+  return timePart;
 }
 
 /** Market status Mon–Fri 9:30–16:00 America/New_York. */
