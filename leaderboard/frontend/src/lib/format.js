@@ -52,17 +52,41 @@ export function xLabel(dateStr, mode = 'time') {
   return timePart;
 }
 
-/** Market status Mon–Fri 9:30–16:00 America/New_York. */
-export function marketStatus() {
+/**
+ * Shared session-window logic for a market's local time-of-day, given a
+ * list of [openMinute, closeMinute) trading sessions (more than one for
+ * exchanges with a midday break, e.g. Bursa Malaysia).
+ */
+function _sessionStatus(mins, isWeekday, sessions) {
+  if (!isWeekday) return { label: 'Market Closed', color: '#a39fb0' };
+  if (mins < sessions[0][0]) return { label: 'Pre-Market', color: '#7c3aed' };
+  for (const [open, close] of sessions) {
+    if (mins >= open && mins < close) return { label: 'Market Open', color: '#16a34a' };
+  }
+  if (mins >= sessions[sessions.length - 1][1]) return { label: 'After Hours', color: '#a39fb0' };
+  return { label: 'Lunch Break', color: '#a39fb0' };
+}
+
+function _localMinutes(timeZone) {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York', hour12: false, weekday: 'short', hour: '2-digit', minute: '2-digit',
+    timeZone, hour12: false, weekday: 'short', hour: '2-digit', minute: '2-digit',
   }).formatToParts(new Date());
   const map = {};
   parts.forEach((p) => { map[p.type] = p.value; });
-  const mins = parseInt(map.hour, 10) * 60 + parseInt(map.minute, 10);
-  const isWeekday = !['Sat', 'Sun'].includes(map.weekday);
-  if (!isWeekday) return { label: 'Market Closed', color: '#a39fb0' };
-  if (mins < 9 * 60 + 30) return { label: 'Pre-Market', color: '#7c3aed' };
-  if (mins >= 16 * 60) return { label: 'After Hours', color: '#a39fb0' };
-  return { label: 'Market Open', color: '#16a34a' };
+  return {
+    mins: parseInt(map.hour, 10) * 60 + parseInt(map.minute, 10),
+    isWeekday: !['Sat', 'Sun'].includes(map.weekday),
+  };
+}
+
+/** US market status Mon–Fri 9:30–16:00 America/New_York. */
+export function marketStatusUS() {
+  const { mins, isWeekday } = _localMinutes('America/New_York');
+  return _sessionStatus(mins, isWeekday, [[9 * 60 + 30, 16 * 60]]);
+}
+
+/** Bursa Malaysia status Mon–Fri 9:00–12:30 & 14:30–17:00 Asia/Kuala_Lumpur. */
+export function marketStatusMY() {
+  const { mins, isWeekday } = _localMinutes('Asia/Kuala_Lumpur');
+  return _sessionStatus(mins, isWeekday, [[9 * 60, 12 * 60 + 30], [14 * 60 + 30, 17 * 60]]);
 }

@@ -8,7 +8,7 @@ import {
   LineElement,
   Tooltip,
 } from 'chart.js';
-import { firstName, marketStatus, xLabel } from '../lib/format';
+import { firstName, marketStatusMY, marketStatusUS, xLabel } from '../lib/format';
 import { zeroLinePlugin, makeEndLabelPlugin } from '../lib/chartPlugins';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip);
@@ -81,7 +81,8 @@ export default function ChartPanel({ users }) {
   const [mode, setMode] = useState('%');
   const [tf, setTf] = useState('ALL');
   const [hidden, setHidden] = useState(() => new Set());
-  const [status, setStatus] = useState(marketStatus());
+  const [statusUS, setStatusUS] = useState(marketStatusUS());
+  const [statusMY, setStatusMY] = useState(marketStatusMY());
   const [avatarImages, setAvatarImages] = useState({});
 
   // react-chartjs-2 binds the `plugins` prop's functions once at chart
@@ -92,7 +93,10 @@ export default function ChartPanel({ users }) {
   liveRef.current = { users, mode, avatarImages };
 
   useEffect(() => {
-    const id = setInterval(() => setStatus(marketStatus()), 60000);
+    const id = setInterval(() => {
+      setStatusUS(marketStatusUS());
+      setStatusMY(marketStatusMY());
+    }, 60000);
     return () => clearInterval(id);
   }, []);
 
@@ -212,9 +216,17 @@ export default function ChartPanel({ users }) {
             <button className={`toggle-btn ${tf === '1W' ? 'active' : ''}`} onClick={() => setTf('1W')}>1W</button>
           </div>
         </div>
-        <div className="status-badge">
-          <span className="dot" style={{ background: status.color }} />
-          {status.label}
+        <div className="status-badge-group">
+          <div className="status-badge">
+            <span className="status-market">US</span>
+            <span className="dot" style={{ background: statusUS.color }} />
+            {statusUS.label}
+          </div>
+          <div className="status-badge">
+            <span className="status-market">MSIA</span>
+            <span className="dot" style={{ background: statusMY.color }} />
+            {statusMY.label}
+          </div>
         </div>
       </div>
 
