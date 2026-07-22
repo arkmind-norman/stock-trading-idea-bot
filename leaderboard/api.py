@@ -190,15 +190,20 @@ async def leaderboard_data() -> dict[str, Any]:
             )
             latest_today[s.user_id] = s.cumulative_pnl  # ascending order — last wins
 
+        # Single shared timestamp for every synthetic "now" anchor point
+        # below — the chart's x-axis is a category scale, so per-user calls
+        # to datetime.now() would each land in a different microsecond and
+        # become distinct categories, making lines stop at different points
+        # instead of all reaching "now" together.
+        now_iso = datetime.now(timezone.utc).isoformat()
+
         # Users with a today's-DailyEquity row (written immediately when a new
         # idea opens) but no intraday snapshot yet — e.g. before market open —
         # still need a point for today so their line doesn't just stop at
         # yesterday's close.
         for user_id, pnl in today_daily.items():
             if user_id not in latest_today:
-                curves_by_user[user_id].append(
-                    {"date": datetime.now(timezone.utc).isoformat(), "equity": float(pnl)}
-                )
+                curves_by_user[user_id].append({"date": now_iso, "equity": float(pnl)})
                 latest_today[user_id] = pnl
 
         # Users with neither an intraday snapshot nor a fresh today's-row
@@ -207,9 +212,7 @@ async def leaderboard_data() -> dict[str, Any]:
         # close instead of just stopping there.
         for user_id, pnl in prior_close.items():
             if user_id not in latest_today:
-                curves_by_user[user_id].append(
-                    {"date": datetime.now(timezone.utc).isoformat(), "equity": float(pnl)}
-                )
+                curves_by_user[user_id].append({"date": now_iso, "equity": float(pnl)})
                 latest_today[user_id] = pnl
 
         # Chart.js can't draw a visible line from a single point (and point
