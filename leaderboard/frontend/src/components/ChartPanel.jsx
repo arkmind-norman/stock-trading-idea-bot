@@ -13,14 +13,25 @@ import { zeroLinePlugin, makeEndLabelPlugin } from '../lib/chartPlugins';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip);
 
-function buildChartData(users, tf, mode, hidden) {
+const parseDate = (s) => (s.includes('T') ? new Date(s) : new Date(`${s}T00:00:00`));
+
+function buildChartData(users, tf, mode, hidden, isMobile) {
   const dateSet = new Set();
   users.forEach((u) => u.equity_curve.forEach((p) => dateSet.add(p.date)));
   let dates = [...dateSet].sort();
-  if (tf === '1W') dates = dates.slice(-7);
-  if (tf === '1M') dates = dates.slice(-30);
 
-  const datasets = users.map((u) => {
+  // Points are now dense intraday buckets rather than one-per-day, so 1W/1M
+  // filter by actual elapsed time from the most recent point, not by
+  // slicing the last N array entries (which used to mean "N days" back
+  // when there was only one point per day).
+  if (dates.length && (tf === '1W' || tf === '1M')) {
+    const lastMs = parseDate(dates[dates.length - 1]).getTime();
+    const windowMs = (tf === '1W' ? 7 : 30) * 24 * 3600 * 1000;
+    const cutoff = lastMs - windowMs;
+    dates = dates.filter((d) => parseDate(d).getTime() >= cutoff);
+  }
+
+  let series = users.map((u) => {
     const byDate = {};
     u.equity_curve.forEach((p) => { byDate[p.date] = p.equity; });
     let vals = dates.map((d) => (d in byDate ? byDate[d] : null));
@@ -28,18 +39,40 @@ function buildChartData(users, tf, mode, hidden) {
       const notional = Math.max((u.idea_count || 0) * 1000, 1000);
       vals = vals.map((v) => (v != null ? (v / notional) * 100 : null));
     }
-    return {
-      label: u.display_name,
-      data: vals,
-      borderColor: u.color,
-      backgroundColor: 'transparent',
-      tension: 0.3,
-      pointRadius: 0,
-      borderWidth: 2.5,
-      spanGaps: true,
-      hidden: hidden.has(u.telegram_user_id),
-    };
+    return { user: u, vals };
   });
+
+  // Mobile screens are much narrower than desktop — the same point density
+  // reads as a cramped zigzag instead of a smooth line. Halve it: merge
+  // consecutive points in pairs, averaging each user's values per pair, so
+  // the mobile chart still looks natural rather than just being squeezed.
+  if (isMobile && dates.length > 20) {
+    const factor = 2;
+    const newDates = [];
+    const merged = series.map(() => []);
+    for (let i = 0; i < dates.length; i += factor) {
+      const end = Math.min(i + factor, dates.length);
+      newDates.push(dates[end - 1]);
+      series.forEach((s, si) => {
+        const chunk = s.vals.slice(i, end).filter((v) => v != null);
+        merged[si].push(chunk.length ? chunk.reduce((a, b) => a + b, 0) / chunk.length : null);
+      });
+    }
+    dates = newDates;
+    series = series.map((s, si) => ({ user: s.user, vals: merged[si] }));
+  }
+
+  const datasets = series.map(({ user: u, vals }) => ({
+    label: u.display_name,
+    data: vals,
+    borderColor: u.color,
+    backgroundColor: 'transparent',
+    tension: 0.3,
+    pointRadius: 0,
+    borderWidth: 2.5,
+    spanGaps: true,
+    hidden: hidden.has(u.telegram_user_id),
+  }));
 
   return { labels: dates, datasets };
 }
@@ -83,8 +116,11 @@ export default function ChartPanel({ users }) {
     });
   }
 
-  const chartData = useMemo(() => buildChartData(users, tf, mode, hidden), [users, tf, mode, hidden]);
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 760;
+  const chartData = useMemo(
+    () => buildChartData(users, tf, mode, hidden, isMobile),
+    [users, tf, mode, hidden, isMobile],
+  );
 
   // Points now span anywhere from a few minutes to several months, so tick
   // labels adapt: show a bare time when the whole visible range fits in a
@@ -92,8 +128,7 @@ export default function ChartPanel({ users }) {
   const tickMode = useMemo(() => {
     const dates = chartData.labels;
     if (dates.length < 2) return 'time';
-    const parse = (s) => (s.includes('T') ? new Date(s) : new Date(`${s}T00:00:00`));
-    const spanMs = parse(dates[dates.length - 1]) - parse(dates[0]);
+    const spanMs = parseDate(dates[dates.length - 1]) - parseDate(dates[0]);
     return spanMs > 36 * 3600 * 1000 ? 'date' : 'time';
   }, [chartData.labels]);
 
