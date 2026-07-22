@@ -18,6 +18,7 @@
   --mono: 'IBM Plex Mono', monospace;
   --sans: 'Sora', sans-serif;
   --shadow: 0 1px 2px rgba(24,10,45,.05), 0 6px 20px rgba(24,10,45,.04);
+  --side-col-width: 380px;
 }
 html, body, #root { height: 100%; }
 body { background: var(--bg); color: var(--text); font-family: var(--sans); display: flex; flex-direction: column; overflow: hidden; }
@@ -83,6 +84,10 @@ a { color: var(--purple); }
    squeezed toward 0). Doesn't trigger at normal window heights. */
 .main-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
 
+/* ── Side column — positions/orders (top) + idea feed (bottom), stacked,
+   same width as the ranked panel it sits next to ─────────────────────── */
+.side-col { flex: 0 0 var(--side-col-width); display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+
 /* ── Info panel — compact horizontal strip ───────────────────────────── */
 .info-panel {
   flex-shrink: 0;
@@ -102,7 +107,7 @@ a { color: var(--purple); }
 
 /* ── Ranked panel — full-height right sidebar ────────────────────────── */
 .ranked-panel {
-  flex: 0 0 380px;
+  flex: 0 0 var(--side-col-width);
   padding: 6px;
   display: flex; flex-direction: column;
   min-height: 0;
@@ -135,14 +140,11 @@ a { color: var(--purple); }
 }
 .view-btn:hover { background: var(--purple-dark); }
 
-/* ── Chart panel — prioritized, fills remaining main-column height ──── */
+/* ── Chart panel — the only flex item left in main-col besides the fixed-
+   height info strip, so it fills all remaining height down to the bottom
+   of the screen on its own. ──────────────────────────────────────────── */
 .chart-panel {
-  /* Proportional (not fixed) share of main-col's height, alongside
-     .bottom-row below — together they always consume exactly all
-     available space, so there's never a leftover gap regardless of
-     viewport height, and the chart (the priority element) gets the
-     larger share of it. */
-  flex: 3 1 0; min-height: 260px;
+  flex: 1; min-height: 0;
   display: flex; flex-direction: column;
   padding: 20px 22px 16px;
 }
@@ -164,11 +166,8 @@ a { color: var(--purple); }
 .chart-wrap { position: relative; flex: 1; min-height: 0; }
 .chart-wrap canvas { display: block; }
 
-/* ── Bottom row: idea feed + portfolio, side by side ─────────────────── */
-.bottom-row { flex: 1.3 1 0; min-height: 170px; display: flex; gap: 14px; }
-
-/* ── Chat / idea feed panel ──────────────────────────────────────────── */
-.chat-panel { flex: 1.3; display: flex; flex-direction: column; min-height: 0; }
+/* ── Chat / idea feed panel — bottom half of .side-col ────────────────── */
+.chat-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .chat-panel .panel-hdr { border-bottom: 1px solid var(--border); }
 .chat-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 4px; }
 .chat-item { padding: 12px 14px; margin: 2px 6px; border-radius: 14px; cursor: pointer; border: 1px solid transparent; transition: all .12s; }
@@ -181,7 +180,7 @@ a { color: var(--purple); }
 .chat-body b { color: var(--text); }
 .chat-tag { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
 
-/* ── Portfolio panel ──────────────────────────────────────────────────── */
+/* ── Portfolio panel — top half of .side-col ──────────────────────────── */
 .portfolio-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 8px; }
 .pf-hdr { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 12px; border-bottom: 1px solid var(--border); }
 .pf-user { display: flex; align-items: center; gap: 9px; min-width: 0; }
@@ -223,7 +222,7 @@ a { color: var(--purple); }
   .info-panel { align-items: flex-start; }
   .chart-panel { flex: none; }
   .chart-wrap { flex: none; height: 300px; }
-  .bottom-row { flex: none; height: auto; flex-direction: column; }
+  .side-col { flex: none; gap: 14px; margin-top: 14px; }
   .chat-panel, .portfolio-panel { flex: none; max-height: 360px; }
   .ranked-panel { margin-top: 14px; max-height: 420px; }
   .rk-list { max-height: 360px; }

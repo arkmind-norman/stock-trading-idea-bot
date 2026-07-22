@@ -61,10 +61,10 @@ export default function App() {
             <div className="main-col">
               <InfoPanel traderCount={data?.users.length ?? 0} />
               <ChartPanel users={data?.users ?? []} />
-              <div className="bottom-row">
-                <ChatPanel feed={data?.feed ?? []} onSelect={setSelected} />
-                <PortfolioPanel users={data?.users ?? []} feed={data?.feed ?? []} selected={selected} />
-              </div>
+            </div>
+            <div className="side-col">
+              <PortfolioPanel users={data?.users ?? []} feed={data?.feed ?? []} selected={selected} />
+              <ChatPanel feed={data?.feed ?? []} onSelect={setSelected} />
             </div>
             <RankedPanel users={data?.users ?? []} selected={selected} onSelect={setSelected} />
           </>
