@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     POSITION_NOTIONAL: float = 1000.0
     DEFAULT_HOLDING_TRADING_DAYS: int = 90
-    MAX_OPEN_POSITIONS_PER_USER: int = 10
+    MAX_OPEN_POSITIONS_PER_USER: int = 20
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
