@@ -5,16 +5,17 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.commands import leaderboard_command, myideas_command
 from bot.llm import TradeIdea, classify_and_extract
 from db.database import AsyncSessionLocal
-from db.models import Direction, Idea, IdeaStatus, User
+from db.models import Direction, Idea, IdeaStatus, Position, PositionStatus, User
 from simulator.daily_job import snapshot_user_equity
-from simulator.engine import open_position
-from simulator.market_data import resolve_ticker
+from simulator.engine import close_position, open_position
+from simulator.market_data import get_latest_price, resolve_ticker
 
 logger = logging.getLogger(__name__)
 
@@ -132,14 +133,9 @@ async def _process_trade_idea(
         )
         trade_idea.ticker = resolved
 
-    # ── Instant acknowledgement — sends before price fetch ───────────────────
-    arrow = "📈" if trade_idea.direction == "long" else "📉"
-    ack = await msg.reply_text(
-        f"{arrow} <b>{trade_idea.ticker}</b> {trade_idea.direction.upper()} locked in for {mention} — fetching price...",
-        parse_mode="HTML",
-    )
-
-    # ── Persist user + idea ────────────────────────────────────────────────
+    # ── User lookup/creation — needed up front to check for a conflicting
+    # open position, regardless of whether this message ends up opening a
+    # new position or closing an existing one ───────────────────────────────
     async with AsyncSessionLocal() as session:
         db_user = await _get_or_create_user(
             session,
@@ -164,9 +160,41 @@ async def _process_trade_idea(
                 logger.warning("Could not fetch profile photo for user %s", tg_user.id)
 
         await session.flush()
+        db_user_id = db_user.id
 
+        # An open position on this same ticker in the *opposite* direction
+        # — e.g. an existing LONG when this message says "sell" (which the
+        # LLM extracts as direction="short") — means the message is meant
+        # to close what's already held, not open a new opposing position.
+        conflicting: list[Position] = (
+            await session.execute(
+                select(Position)
+                .join(Idea, Position.idea_id == Idea.id)
+                .where(
+                    Idea.user_id == db_user_id,
+                    Idea.ticker == trade_idea.ticker,
+                    Position.status == PositionStatus.open,
+                    Idea.direction != Direction(trade_idea.direction),
+                )
+                .options(selectinload(Position.idea))
+            )
+        ).scalars().all()
+
+    if conflicting:
+        await _close_conflicting_positions(msg, conflicting, db_user_id, mention, trade_idea)
+        return
+
+    # ── Instant acknowledgement — sends before price fetch ───────────────────
+    arrow = "📈" if trade_idea.direction == "long" else "📉"
+    ack = await msg.reply_text(
+        f"{arrow} <b>{trade_idea.ticker}</b> {trade_idea.direction.upper()} locked in for {mention} — fetching price...",
+        parse_mode="HTML",
+    )
+
+    # ── Persist idea ────────────────────────────────────────────────────────
+    async with AsyncSessionLocal() as session:
         idea = Idea(
-            user_id=db_user.id,
+            user_id=db_user_id,
             raw_text=text,
             ticker=trade_idea.ticker,
             company_name=trade_idea.company_name,
@@ -179,7 +207,6 @@ async def _process_trade_idea(
         session.add(idea)
         await session.commit()
         idea_id = idea.id
-        db_user_id = db_user.id
 
     # ── Open the simulated position ───────────────────────────────────────
     try:
@@ -214,6 +241,54 @@ async def _process_trade_idea(
         lines.append(" · ".join(extras))
 
     await ack.edit_text("\n".join(lines), parse_mode="HTML")
+
+
+async def _close_conflicting_positions(
+    msg,
+    positions: list[Position],
+    user_id: int,
+    mention: str,
+    trade_idea: TradeIdea,
+) -> None:
+    """
+    Close each given open position — already confirmed to be on the same
+    ticker as trade_idea but in the opposite direction — at the current
+    market price, treating the new message as an exit signal rather than a
+    request to open a new opposing position on top of it.
+    """
+    exit_time = datetime.utcnow()
+    closed_lines = []
+    for position in positions:
+        try:
+            exit_price = await get_latest_price(position.idea.ticker)
+        except Exception:
+            logger.exception("Could not fetch exit price for position %d", position.id)
+            continue
+        pnl = await close_position(position.id, exit_price, exit_time)
+        closed_lines.append(
+            f"Closed <b>{position.idea.direction.value.upper()}</b> "
+            f"<b>{position.idea.ticker}</b> @ <b>${float(exit_price):,.2f}</b> "
+            f"— {'+' if pnl >= 0 else ''}${float(pnl):,.2f}"
+        )
+
+    if not closed_lines:
+        await msg.reply_text(
+            f"Tried to close the existing <b>{trade_idea.ticker}</b> position for {mention} "
+            f"but couldn't fetch the market price right now. Try again later!",
+            parse_mode="HTML",
+        )
+        return
+
+    try:
+        await snapshot_user_equity(user_id)
+    except Exception:
+        logger.warning("snapshot_user_equity failed for user %d — leaderboard will update at EOD", user_id)
+
+    await msg.reply_text(
+        f"✅ {mention} already held a position on <b>{trade_idea.ticker}</b> — closing it "
+        f"instead of opening a new {trade_idea.direction} one.\n" + "\n".join(closed_lines),
+        parse_mode="HTML",
+    )
 
 
 async def _mark_idea_rejected(idea_id: int) -> None:
