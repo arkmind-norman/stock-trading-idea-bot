@@ -90,3 +90,9 @@ export function marketStatusMY() {
   const { mins, isWeekday } = _localMinutes('Asia/Kuala_Lumpur');
   return _sessionStatus(mins, isWeekday, [[9 * 60, 12 * 60 + 30], [14 * 60 + 30, 17 * 60]]);
 }
+
+/** HKEX status Mon–Fri 9:30–12:00 & 13:00–16:00 Asia/Hong_Kong. */
+export function marketStatusHK() {
+  const { mins, isWeekday } = _localMinutes('Asia/Hong_Kong');
+  return _sessionStatus(mins, isWeekday, [[9 * 60 + 30, 12 * 60], [13 * 60, 16 * 60]]);
+}

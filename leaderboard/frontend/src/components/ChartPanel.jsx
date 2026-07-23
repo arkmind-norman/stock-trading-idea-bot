@@ -8,7 +8,7 @@ import {
   LineElement,
   Tooltip,
 } from 'chart.js';
-import { firstName, marketStatusMY, marketStatusUS, xLabel } from '../lib/format';
+import { firstName, marketStatusHK, marketStatusMY, marketStatusUS, xLabel } from '../lib/format';
 import { zeroLinePlugin, makeEndLabelPlugin } from '../lib/chartPlugins';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip);
@@ -83,6 +83,7 @@ export default function ChartPanel({ users }) {
   const [hidden, setHidden] = useState(() => new Set());
   const [statusUS, setStatusUS] = useState(marketStatusUS());
   const [statusMY, setStatusMY] = useState(marketStatusMY());
+  const [statusHK, setStatusHK] = useState(marketStatusHK());
   const [avatarImages, setAvatarImages] = useState({});
 
   // react-chartjs-2 binds the `plugins` prop's functions once at chart
@@ -96,6 +97,7 @@ export default function ChartPanel({ users }) {
     const id = setInterval(() => {
       setStatusUS(marketStatusUS());
       setStatusMY(marketStatusMY());
+      setStatusHK(marketStatusHK());
     }, 60000);
     return () => clearInterval(id);
   }, []);
@@ -226,6 +228,11 @@ export default function ChartPanel({ users }) {
             <span className="status-market">MSIA</span>
             <span className="dot" style={{ background: statusMY.color }} />
             {statusMY.label}
+          </div>
+          <div className="status-badge">
+            <span className="status-market">HK</span>
+            <span className="dot" style={{ background: statusHK.color }} />
+            {statusHK.label}
           </div>
         </div>
       </div>
