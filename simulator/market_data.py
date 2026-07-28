@@ -7,6 +7,7 @@ Swapping yfinance for another provider only requires changing this file.
 from __future__ import annotations
 
 import asyncio
+import math
 import re
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -138,13 +139,16 @@ async def get_latest_price(ticker: str) -> Decimal:
 
     async with AsyncSessionLocal() as session:
         cached = await session.get(PriceTick, (ticker, today))
-        if cached is not None:
+        if cached is not None and not cached.price.is_nan():
             return cached.price
 
     hist = yf.Ticker(ticker).history(period="5d")
     if hist.empty:
         raise ValueError(f"yfinance returned no data for {ticker!r}")
-    price = Decimal(str(float(hist["Close"].iloc[-1]))).quantize(Decimal("0.0001"))
+    close = float(hist["Close"].iloc[-1])
+    if math.isnan(close):
+        raise ValueError(f"yfinance returned a NaN close price for {ticker!r}")
+    price = Decimal(str(close)).quantize(Decimal("0.0001"))
 
     async with AsyncSessionLocal() as session:
         stmt = (
@@ -161,11 +165,13 @@ async def get_latest_price(ticker: str) -> Decimal:
 def _fetch_intraday_price_sync(ticker: str) -> Decimal:
     """Synchronous live-price fetch — intended to run in an executor."""
     last = yf.Ticker(ticker).fast_info.get("last_price")
-    if last is None:
+    if last is None or math.isnan(last):
         hist = yf.Ticker(ticker).history(period="1d", interval="1m")
         if hist.empty:
             raise ValueError(f"yfinance returned no intraday data for {ticker!r}")
         last = float(hist["Close"].iloc[-1])
+    if math.isnan(last):
+        raise ValueError(f"yfinance returned a NaN intraday price for {ticker!r}")
     return Decimal(str(last)).quantize(Decimal("0.0001"))
 
 
@@ -223,8 +229,9 @@ async def fetch_daily_closes(ticker: str, start: date, end: date) -> Dict[date, 
     fetched: Dict[date, Decimal] = {}
     for ts, row in hist.iterrows():
         d = ts.date()
-        if d not in cached:
-            fetched[d] = Decimal(str(float(row["Close"]))).quantize(Decimal("0.0001"))
+        close = float(row["Close"])
+        if d not in cached and not math.isnan(close):
+            fetched[d] = Decimal(str(close)).quantize(Decimal("0.0001"))
 
     if fetched:
         async with AsyncSessionLocal() as session:

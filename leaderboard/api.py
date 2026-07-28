@@ -302,7 +302,7 @@ async def leaderboard_data() -> dict[str, Any]:
         for uid, grp in groupby(closed_rows, key=lambda r: r.user_id):
             streak = 0
             for row in grp:
-                if row.pnl is not None and row.pnl > 0:
+                if row.pnl is not None and not row.pnl.is_nan() and row.pnl > 0:
                     streak += 1
                 else:
                     break
@@ -478,6 +478,7 @@ async def user_data(telegram_user_id: str) -> dict[str, Any]:
                 idea.status == IdeaStatus.closed
                 and idea.position
                 and idea.position.pnl is not None
+                and not idea.position.pnl.is_nan()
             ):
                 if idea.position.pnl > 0:
                     streak += 1
