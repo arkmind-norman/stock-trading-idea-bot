@@ -7,6 +7,7 @@ Swapping yfinance for another provider only requires changing this file.
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import re
 from datetime import date, datetime, timedelta, timezone
@@ -20,6 +21,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from db.database import AsyncSessionLocal
 from db.models import PriceTick
+
+logger = logging.getLogger(__name__)
 
 _NY_TZ = ZoneInfo("America/New_York")
 _KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")
@@ -64,6 +67,53 @@ def is_ticker_market_open(ticker: str) -> bool:
 
 
 _BARE_DIGITS_RE = re.compile(r"^\d{1,6}$")
+
+
+# ── Negative cache for dead symbols ────────────────────────────────────────────
+# A delisted or mistyped ticker fails identically on every call, and both price
+# jobs swallow the exception and try again on the next tick — so one bad symbol
+# costs a full yfinance round-trip every minute, forever (1,440/day). Back off
+# exponentially per ticker instead, and let a single success clear the entry.
+_FAILURE_GRACE = 2  # fail this many times before backing off at all
+_FAILURE_BASE_COOLDOWN = timedelta(minutes=5)
+_FAILURE_MAX_COOLDOWN = timedelta(hours=6)
+
+# ticker -> (consecutive_failures, do-not-retry-before)
+_failures: dict[str, tuple[int, datetime]] = {}
+
+
+def _raise_if_known_bad(ticker: str) -> None:
+    """Short-circuit a ticker that is in its cooldown window, without a network call."""
+    entry = _failures.get(ticker)
+    if entry is None:
+        return
+    count, retry_after = entry
+    if datetime.now(timezone.utc) < retry_after:
+        raise ValueError(
+            f"{ticker!r} failed {count}x in a row; skipping until "
+            f"{retry_after.isoformat(timespec='seconds')}"
+        )
+
+
+def _record_failure(ticker: str) -> None:
+    count = _failures.get(ticker, (0, None))[0] + 1
+    if count <= _FAILURE_GRACE:
+        cooldown = timedelta(0)
+    else:
+        cooldown = min(
+            _FAILURE_BASE_COOLDOWN * (2 ** (count - _FAILURE_GRACE - 1)),
+            _FAILURE_MAX_COOLDOWN,
+        )
+    _failures[ticker] = (count, datetime.now(timezone.utc) + cooldown)
+    if cooldown:
+        logger.warning(
+            "market_data: %s failed %d consecutive fetches — backing off %s",
+            ticker, count, cooldown,
+        )
+
+
+def _clear_failure(ticker: str) -> None:
+    _failures.pop(ticker, None)
 
 
 def _yf_has_data(ticker: str) -> bool:
@@ -130,6 +180,17 @@ async def resolve_ticker(
     return None
 
 
+def _fetch_latest_price_sync(ticker: str) -> Decimal:
+    """Synchronous close-price fetch — intended to run in an executor."""
+    hist = yf.Ticker(ticker).history(period="5d")
+    if hist.empty:
+        raise ValueError(f"yfinance returned no data for {ticker!r}")
+    close = float(hist["Close"].iloc[-1])
+    if math.isnan(close):
+        raise ValueError(f"yfinance returned a NaN close price for {ticker!r}")
+    return Decimal(str(close)).quantize(Decimal("0.0001"))
+
+
 async def get_latest_price(ticker: str) -> Decimal:
     """
     Return the most recent available close price for ticker.
@@ -142,19 +203,30 @@ async def get_latest_price(ticker: str) -> Decimal:
         if cached is not None and not cached.price.is_nan():
             return cached.price
 
-    hist = yf.Ticker(ticker).history(period="5d")
-    if hist.empty:
-        raise ValueError(f"yfinance returned no data for {ticker!r}")
-    close = float(hist["Close"].iloc[-1])
-    if math.isnan(close):
-        raise ValueError(f"yfinance returned a NaN close price for {ticker!r}")
-    price = Decimal(str(close)).quantize(Decimal("0.0001"))
+    _raise_if_known_bad(ticker)
+
+    # yfinance is synchronous; calling it directly here blocks the single
+    # event loop that also serves the web app and the bot, so every request
+    # in flight stalls for the duration of the HTTP round-trip.
+    loop = asyncio.get_event_loop()
+    try:
+        price = await loop.run_in_executor(None, _fetch_latest_price_sync, ticker)
+    except Exception:
+        _record_failure(ticker)
+        raise
+    _clear_failure(ticker)
 
     async with AsyncSessionLocal() as session:
         stmt = (
             pg_insert(PriceTick)
             .values(ticker=ticker, date=today, price=price)
-            .on_conflict_do_nothing()
+            # do_update, not do_nothing: a row cached as NaN is rejected by the
+            # read above, so do_nothing would leave it poisoned forever and
+            # send every later call back out to yfinance.
+            .on_conflict_do_update(
+                index_elements=["ticker", "date"],
+                set_={"price": price},
+            )
         )
         await session.execute(stmt)
         await session.commit()
@@ -185,8 +257,15 @@ async def get_intraday_price(ticker: str) -> Decimal:
     Refreshes today's price_ticks row as a side effect, so other callers of
     get_latest_price() benefit from the freshest price too.
     """
+    _raise_if_known_bad(ticker)
+
     loop = asyncio.get_event_loop()
-    price = await loop.run_in_executor(None, _fetch_intraday_price_sync, ticker)
+    try:
+        price = await loop.run_in_executor(None, _fetch_intraday_price_sync, ticker)
+    except Exception:
+        _record_failure(ticker)
+        raise
+    _clear_failure(ticker)
 
     today = datetime.now(timezone.utc).date()
     async with AsyncSessionLocal() as session:
@@ -202,6 +281,14 @@ async def get_intraday_price(ticker: str) -> Decimal:
         await session.commit()
 
     return price
+
+
+def _fetch_daily_closes_sync(ticker: str, start: date, end: date):
+    """Synchronous date-range history fetch — intended to run in an executor."""
+    return yf.Ticker(ticker).history(
+        start=start.isoformat(),
+        end=(end + timedelta(days=1)).isoformat(),  # yfinance end is exclusive
+    )
 
 
 async def fetch_daily_closes(ticker: str, start: date, end: date) -> Dict[date, Decimal]:
@@ -222,9 +309,15 @@ async def fetch_daily_closes(ticker: str, start: date, end: date) -> Dict[date, 
     cached: Dict[date, Decimal] = {r.date: r.price for r in rows}
 
     # Always re-fetch from yfinance to fill any missing trading days.
-    hist = yf.Ticker(ticker).history(
-        start=start.isoformat(),
-        end=(end + timedelta(days=1)).isoformat(),  # yfinance end is exclusive
+    # Runs in an executor for the same reason as get_latest_price() — a bare
+    # yf call here would block the event loop for the whole round-trip.
+    loop = asyncio.get_event_loop()
+    hist = await loop.run_in_executor(
+        None,
+        _fetch_daily_closes_sync,
+        ticker,
+        start,
+        end,
     )
     fetched: Dict[date, Decimal] = {}
     for ts, row in hist.iterrows():
