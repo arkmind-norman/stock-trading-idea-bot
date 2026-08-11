@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 _NY_TZ = ZoneInfo("America/New_York")
 _KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")
+_HK_TZ = ZoneInfo("Asia/Hong_Kong")
 
 
 def is_market_open() -> bool:
@@ -52,17 +53,40 @@ def is_bursa_open() -> bool:
     return morning or afternoon
 
 
+def is_hkex_open() -> bool:
+    """
+    True Mon–Fri during HKEX's two trading sessions — 9:30–12:00 and
+    13:00–16:00 Asia/Hong_Kong — excluding the midday lunch break.
+    Ignores Hong Kong market holidays.
+
+    Mirrors marketStatusHK() in leaderboard/frontend/src/lib/format.js. Hong
+    Kong shares Malaysia's UTC+8 offset but not its session schedule, so this
+    can't reuse is_bursa_open().
+    """
+    now = datetime.now(_HK_TZ)
+    if now.weekday() >= 5:
+        return False
+    minutes = now.hour * 60 + now.minute
+    morning = 9 * 60 + 30 <= minutes < 12 * 60
+    afternoon = 13 * 60 <= minutes < 16 * 60
+    return morning or afternoon
+
+
 def is_ticker_market_open(ticker: str) -> bool:
     """
     Dispatches to the right exchange's trading hours based on the ticker's
-    suffix. Bursa Malaysia (.KL) and US markets trade in non-overlapping
-    windows (Malaysia is UTC+8, opposite side of the clock from US Eastern),
-    so a single global "is the market open" check would either miss Bursa's
-    entire session or misreport it as open during US hours when Bursa is
-    actually closed. Everything else defaults to US hours.
+    suffix. Bursa Malaysia (.KL), HKEX (.HK) and US markets trade in
+    non-overlapping windows (Malaysia and Hong Kong are UTC+8, opposite side
+    of the clock from US Eastern), so a single global "is the market open"
+    check would either miss the Asian sessions entirely or misreport them as
+    open during US hours when they are actually closed. Everything else
+    defaults to US hours.
     """
-    if ticker.upper().endswith(".KL"):
+    suffix = ticker.upper()
+    if suffix.endswith(".KL"):
         return is_bursa_open()
+    if suffix.endswith(".HK"):
+        return is_hkex_open()
     return is_market_open()
 
 
@@ -236,9 +260,12 @@ async def get_latest_price(ticker: str) -> Decimal:
 
 def _fetch_intraday_price_sync(ticker: str) -> Decimal:
     """Synchronous live-price fetch — intended to run in an executor."""
-    last = yf.Ticker(ticker).fast_info.get("last_price")
+    tk = yf.Ticker(ticker)
+    # fast_info has no last_price for HKEX symbols (it returns None for every
+    # .HK ticker), so that path always falls through to the 1-minute bars.
+    last = tk.fast_info.get("last_price")
     if last is None or math.isnan(last):
-        hist = yf.Ticker(ticker).history(period="1d", interval="1m")
+        hist = tk.history(period="1d", interval="1m")
         if hist.empty:
             raise ValueError(f"yfinance returned no intraday data for {ticker!r}")
         last = float(hist["Close"].iloc[-1])

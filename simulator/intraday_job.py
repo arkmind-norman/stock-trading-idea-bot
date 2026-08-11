@@ -1,13 +1,13 @@
 """
 Intraday equity (P&L) snapshot job — runs every 1 minute, but only pulls a
 *fresh* price for tickers whose own exchange is currently open (see
-market_data.is_ticker_market_open). Bursa Malaysia (.KL tickers) and US
+market_data.is_ticker_market_open). Bursa Malaysia (.KL), HKEX (.HK) and US
 markets trade in non-overlapping windows, so gating everything on US hours
-alone meant Malaysian positions never got live intraday snapshots during
-Bursa's actual trading session — they'd sit flat until the next once-daily
-mark-to-market. Tickers whose market is currently closed reuse their last
-cached price instead of a live call, since that price genuinely hasn't
-moved.
+alone meant Malaysian and Hong Kong positions never got live intraday
+snapshots during their actual trading sessions — they'd sit flat until the
+next once-daily mark-to-market. Tickers whose market is currently closed
+reuse their last cached price instead of a live call, since that price
+genuinely hasn't moved.
 
 Pulls a fresh price for every ticker with an open position and writes one
 EquitySnapshot row per user (cumulative P&L at that minute), so the
