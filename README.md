@@ -43,7 +43,7 @@ Key variables:
 | `DATABASE_URL` | Postgres connection string (`postgresql+asyncpg://user:pw@host/db`) |
 | `TELEGRAM_MODE` | `polling` for local dev, `webhook` in production |
 | `POSITION_NOTIONAL` | Fixed USD notional per simulated trade (default `1000`) |
-| `DEFAULT_HOLDING_DAYS` | Days before auto-closing a position (default `10`) |
+| `DEFAULT_HOLDING_TRADING_DAYS` | Trading days before auto-closing a position (default `90`) |
 
 ### 3. Create the database
 
